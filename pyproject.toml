@@ -1,0 +1,17 @@
+[project]
+name = "spark"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "datasets",
+    "lightning",
+    "pandas",
+    "pyarrow",
+    "torch",
+    "wandb>=0.22.3",
+]
+
+[dependency-groups]
+dev = ["huggingface-hub", "ipykernel", "jupyter"]
