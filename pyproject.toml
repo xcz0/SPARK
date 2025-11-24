@@ -5,13 +5,21 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "datasets",
     "lightning",
     "pandas",
     "pyarrow",
     "torch",
-    "wandb>=0.22.3",
+    "wandb",
+    "loguru",
+    "h5py",
 ]
 
 [dependency-groups]
-dev = ["huggingface-hub", "ipykernel", "jupyter"]
+dev = [
+    "huggingface-hub",
+    "ipykernel",
+    "jupyter",
+    "jupyterlab",
+    "matplotlib",
+    "seaborn",
+]

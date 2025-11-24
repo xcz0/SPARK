@@ -212,3 +212,4 @@ __marimo__/
 # Directory for storing log files
 /models/
 # Directory for storing model files 
+*.ipynb 
