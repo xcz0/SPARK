@@ -15,7 +15,7 @@ logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s",
 )
 
-RAW_DATA_DIR = Path("./")
+RAW_DATA_DIR = Path("./data")
 OUTPUT_DIR = Path("./processed/")
 
 
@@ -37,7 +37,7 @@ def summarize_data(
     log_data["user_id"] = user_id
 
     # 对每个 day_offset 分组,累计 duration(不包含当前行)
-    log_data["daily_cumulative_duration"] = (
+    log_data["cumulative"] = (
         log_data.groupby("day_offset", sort=False)["duration"]
         .cumsum()
         .shift(1, fill_value=0)
@@ -53,6 +53,8 @@ def summarize_data(
     log_data["is_first_review"] = log_data["elapsed_seconds"] == -1
 
     # 添加对数变换特征
+    log_data["log_duration"] = np.log1p(log_data["duration"])
+    log_data["log_cumulative"] = np.log1p(log_data["cumulative"])
     log_data["log_elapsed_seconds"] = np.log1p(
         log_data["elapsed_seconds"].clip(lower=0)
     )
@@ -60,6 +62,24 @@ def summarize_data(
     log_data.loc[
         log_data["is_first_review"], ["log_elapsed_seconds", "log_elapsed_days"]
     ] = np.inf
+
+    # 显式历史特征 - 该卡片上一次复习的评分和耗时
+    log_data["last_rating_on_card"] = (
+        log_data.groupby("card_id", sort=False)["rating"]
+        .shift(1)
+        .fillna(0)
+        .astype("int8")
+    )
+    log_data["last_log_duration_on_card"] = (
+        log_data.groupby("card_id", sort=False)["log_duration"].shift(1).fillna(np.inf)
+    )
+
+    # Session 上下文特征 - 全局序列上一次复习的信息
+    log_data["prev_rating"] = log_data["rating"].shift(1).fillna(0).astype("int8")
+    log_data["prev_log_duration"] = log_data["log_duration"].shift(1).fillna(np.inf)
+    log_data["is_same_card_as_prev"] = log_data["card_id"] == log_data["card_id"].shift(
+        1
+    )
 
     # Merge log data with card data to get deck_id (只选择需要的列)
     # 如果card_data为空,使用left join并将deck_id填充为0
@@ -128,12 +148,14 @@ def merge_datasets(summaries_dir: Path, batch_size: int = 100) -> None:
         )
 
 
-def process_single_user(user_id: int, summaries_dir: Path) -> tuple[int, str, int, int]:
+def process_single_user(
+    user_id: int, summaries_dir: Path
+) -> tuple[int, str, int, int, dict]:
     """
     处理单个用户的数据
 
     Returns:
-    tuple: (status, message, log_nums, user_id) - status: 0=success, 1=skipped, 2=error
+    tuple: (status, message, log_nums, user_id, user_stats_dict) - status: 0=success, 1=skipped, 2=error
     """
     try:
         output_file = summaries_dir / f"user_id={user_id}.parquet"
@@ -141,7 +163,7 @@ def process_single_user(user_id: int, summaries_dir: Path) -> tuple[int, str, in
         # if output_file.exists():
         #     读取已存在文件的行数用于统计
         #     existing_data = pd.read_parquet(output_file)
-        #     return (1, "", len(existing_data), user_id)
+        #     return (1, "", len(existing_data), user_id, {})
 
         log_data = pd.read_parquet(
             RAW_DATA_DIR / "revlogs" / f"user_id={user_id}" / "data.parquet"
@@ -167,15 +189,26 @@ def process_single_user(user_id: int, summaries_dir: Path) -> tuple[int, str, in
                 summary_df.to_parquet(
                     output_file, index=False, engine="pyarrow", compression="snappy"
                 )
-                return (0, "", log_nums, user_id)
+
+                # 计算用户统计信息
+                user_stats_dict = {
+                    "user_id": user_id,
+                    "user_mean_rating": summary_df["rating"].mean(),
+                    "user_std_rating": summary_df["rating"].std(),
+                    "user_mean_log_duration": summary_df["log_duration"].mean(),
+                    "user_std_log_duration": summary_df["log_duration"].std(),
+                    "total_reviews": log_nums,
+                }
+
+                return (0, "", log_nums, user_id, user_stats_dict)
             except RuntimeWarning:
                 # 如果遇到 divide by zero 警告，跳过此用户并记录
                 error_msg = "RuntimeWarning - divide by zero encountered in log1p"
                 logging.error(f"User {user_id} - {error_msg}")
-                return (2, error_msg, 0, user_id)
+                return (2, error_msg, 0, user_id, {})
 
     except Exception as e:
-        return (2, str(e), 0, user_id)
+        return (2, str(e), 0, user_id, {})
 
 
 if __name__ == "__main__":
@@ -185,7 +218,8 @@ if __name__ == "__main__":
     success_count = 0
     error_count = 0
     skipped_count = 0
-    user_stats = []  # 用于存储用户统计信息
+    user_stats_list = []  # 用于存储用户统计信息
+    description_list = []  # 用于存储description信息
 
     # 使用多进程并行处理
     num_workers = max(1, cpu_count() - 1)  # 保留一个核心给系统
@@ -205,23 +239,71 @@ if __name__ == "__main__":
         )
 
     # 统计结果并收集用户信息
-    for status, error_msg, log_nums, user_id in results:
+    for status, error_msg, log_nums, user_id, user_stats_dict in results:
         if status == 0:
             success_count += 1
-            user_stats.append({"user_id": user_id, "log_nums": log_nums})
+            description_list.append({"user_id": user_id, "log_nums": log_nums})
+            user_stats_list.append(user_stats_dict)
         elif status == 1:
             skipped_count += 1
-            user_stats.append({"user_id": user_id, "log_nums": log_nums})
+            description_list.append({"user_id": user_id, "log_nums": log_nums})
         else:
             error_count += 1
             if error_msg:
                 logging.error(f"User {user_id} - Error: {error_msg}")
 
     # 生成description.csv
-    if user_stats:
-        description_df = pd.DataFrame(user_stats)
+    if description_list:
+        description_df = pd.DataFrame(description_list)
         description_df.to_csv(summaries_dir / "description.csv", index=False)
-        print(f"\n已生成 description.csv,包含 {len(user_stats)} 个用户的统计信息")
+        print(f"\n已生成 description.csv,包含 {len(description_list)} 个用户的统计信息")
+
+    # 生成user_stats.csv
+    if user_stats_list:
+        user_stats_df = pd.DataFrame(user_stats_list)
+        user_stats_df.to_csv(summaries_dir / "user_stats.csv", index=False)
+        print(f"已生成 user_stats.csv,包含 {len(user_stats_list)} 个用户的偏好统计")
+
+    # 生成meta.csv (仅使用前8000个用户数据计算全局统计量)
+    print("\n计算全局统计量 (使用前8000个用户数据)...")
+    global_log_elapsed = []
+    global_log_duration = []
+
+    for user_id in tqdm(range(1, 8001), desc="读取用户数据计算全局统计"):
+        user_file = summaries_dir / f"user_id={user_id}.parquet"
+        if user_file.exists():
+            try:
+                user_df = pd.read_parquet(
+                    user_file, columns=["log_elapsed_seconds", "log_duration"]
+                )
+                # 过滤掉无穷大值
+                valid_elapsed = (
+                    user_df["log_elapsed_seconds"]
+                    .replace([np.inf, -np.inf], np.nan)
+                    .dropna()
+                )
+                valid_duration = (
+                    user_df["log_duration"].replace([np.inf, -np.inf], np.nan).dropna()
+                )
+                global_log_elapsed.extend(valid_elapsed.tolist())
+                global_log_duration.extend(valid_duration.tolist())
+            except Exception as e:
+                logging.error(f"读取用户 {user_id} 数据计算全局统计时出错: {e}")
+
+    if global_log_elapsed and global_log_duration:
+        meta_dict = {
+            "mean_log_elapsed": np.mean(global_log_elapsed),
+            "std_log_elapsed": np.std(global_log_elapsed),
+            "mean_log_duration": np.mean(global_log_duration),
+            "std_log_duration": np.std(global_log_duration),
+        }
+        meta_df = pd.DataFrame([meta_dict])
+        meta_df.to_csv(summaries_dir / "meta.csv", index=False)
+        print(f"已生成 meta.csv,包含全局统计量")
+        print(f"  mean_log_elapsed: {meta_dict['mean_log_elapsed']:.4f}")
+        print(f"  std_log_elapsed: {meta_dict['std_log_elapsed']:.4f}")
+        print(f"  mean_log_duration: {meta_dict['mean_log_duration']:.4f}")
+        print(f"  std_log_duration: {meta_dict['std_log_duration']:.4f}")
 
     print(
         f"\n处理完成: 成功 {success_count} 个用户, 跳过 {skipped_count} 个用户, 失败 {error_count} 个用户"
