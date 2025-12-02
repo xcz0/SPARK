@@ -3,19 +3,24 @@
 from pathlib import Path
 
 import pandas as pd
+import pyarrow.parquet as pq
+import numpy as np
 
 
-def load_user_data(data_dir: Path | str, user_id: int) -> pd.DataFrame:
-    """加载单个用户的数据。
-
-    Args:
-        data_dir: 数据目录路径
-        user_id: 用户 ID
-
-    Returns:
-        用户的复习记录 DataFrame
+def load_user_data(
+    data_dir: Path | str, user_id: int, columns: list[str]
+) -> dict[str, np.ndarray]:
     """
-    return pd.read_parquet(Path(data_dir) / f"user_id={user_id}.parquet")
+    直接通过 PyArrow 读取为 Numpy 数组。
+    只读取需要的列，减少 IO。
+    """
+    file_path = Path(data_dir) / f"user_id={user_id}.parquet"
+
+    table = pq.read_table(file_path, columns=columns)
+
+    return {
+        name: col.to_numpy() for name, col in zip(table.column_names, table.columns)
+    }
 
 
 def load_all_users_data(data_dir: Path | str) -> pd.DataFrame:
