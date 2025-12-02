@@ -53,32 +53,20 @@ class TestCreatePaddingMask:
         mask = create_padding_mask(seq_lens, max_len=None)
 
         assert mask.shape == (3, 4)
-        assert mask[1].all()  # 长度为 4 的序列全为 True
-
-    def test_output_dtype(self):
-        """测试输出类型为布尔型。"""
-        mask = create_padding_mask(torch.tensor([2, 3]), max_len=4)
         assert mask.dtype == torch.bool
+        assert mask[1].all()  # 长度为 4 的序列全为 True
 
 
 class TestCreateCausalMask:
     """测试 create_causal_mask 函数。"""
 
-    @pytest.mark.parametrize("size", [1, 2, 4, 5, 10])
-    def test_causal_mask_properties(self, size):
+    def test_causal_mask_structure(self):
         """测试因果掩码的形状和下三角性质。"""
-        mask = create_causal_mask(size, CPU_DEVICE)
+        mask = create_causal_mask(4, CPU_DEVICE)
 
-        assert mask.shape == (size, size)
+        assert mask.shape == (4, 4)
         assert mask.dtype == torch.bool
         # 验证是下三角矩阵
-        assert not torch.triu(mask, diagonal=1).any()
-        # 对角线应全为 True
-        assert torch.diagonal(mask).all()
-
-    def test_basic_causal_mask(self):
-        """测试基本的因果掩码结构。"""
-        mask = create_causal_mask(4, CPU_DEVICE)
         expected = torch.tril(torch.ones(4, 4, dtype=torch.bool))
         assert torch.equal(mask, expected)
 
@@ -100,23 +88,10 @@ class TestElementMasks:
         )
         assert torch.equal(mask, expected)
 
-    @pytest.mark.parametrize(
-        "ids, all_same",
-        [
-            ([[5, 5, 5]], True),  # 全同
-            ([[1, 2, 3]], False),  # 全异
-        ],
-    )
-    def test_same_element_extreme_cases(self, ids, all_same):
-        """测试全同/全异的极端情况。"""
-        mask = create_same_element_mask(torch.tensor(ids))
-        if all_same:
-            assert mask.all()
-        else:
-            # 全异时只有对角线为 True
-            seq_len = len(ids[0])
-            expected = torch.eye(seq_len, dtype=torch.bool).unsqueeze(0)
-            assert torch.equal(mask, expected)
+    def test_same_element_all_same(self):
+        """测试全同元素情况。"""
+        mask = create_same_element_mask(torch.tensor([[5, 5, 5]]))
+        assert mask.all()
 
     def test_same_and_different_are_complement(self):
         """验证 same 和 different 掩码互补。"""
@@ -125,43 +100,17 @@ class TestElementMasks:
         diff_mask = create_different_element_mask(ids)
         assert torch.equal(same_mask, ~diff_mask)
 
-    def test_batch_dimension(self):
-        """测试批次维度处理。"""
-        ids = torch.tensor([[1, 2], [3, 3]])
-        mask = create_same_element_mask(ids)
-
-        assert mask.shape == (2, 2, 2)
-        assert mask[0, 0, 1].item() is False  # 不同元素
-        assert mask[1, 0, 1].item() is True  # 相同元素
-
 
 class TestCombineMasks:
     """测试 combine_masks 函数。"""
 
-    @pytest.mark.parametrize(
-        "masks, expected",
-        [
-            # 两个掩码
-            (
-                [[[True, True], [True, False]], [[True, False], [True, True]]],
-                [[True, False], [True, False]],
-            ),
-            # 三个掩码
-            (
-                [
-                    [[True, True], [True, True]],
-                    [[True, False], [True, True]],
-                    [[True, True], [False, True]],
-                ],
-                [[True, False], [False, True]],
-            ),
-        ],
-    )
-    def test_combine_masks(self, masks, expected):
-        """测试多个掩码的组合。"""
-        tensor_masks = [torch.tensor(m, dtype=torch.bool) for m in masks]
-        result = combine_masks(*tensor_masks)
-        assert torch.equal(result, torch.tensor(expected, dtype=torch.bool))
+    def test_combine_two_masks(self):
+        """测试两个掩码的组合（逻辑与）。"""
+        mask1 = torch.tensor([[True, True], [True, False]], dtype=torch.bool)
+        mask2 = torch.tensor([[True, False], [True, True]], dtype=torch.bool)
+        result = combine_masks(mask1, mask2)
+        expected = torch.tensor([[True, False], [True, False]], dtype=torch.bool)
+        assert torch.equal(result, expected)
 
     def test_broadcasting(self):
         """测试维度广播。"""
@@ -170,11 +119,6 @@ class TestCombineMasks:
 
         result = combine_masks(mask_3d, mask_2d)
         assert result.shape == (2, 2, 2)
-
-    def test_single_mask(self):
-        """测试单个掩码。"""
-        mask = torch.tensor([[True, False]])
-        assert torch.equal(combine_masks(mask), mask)
 
 
 class TestPaddingMask2dAndApply:

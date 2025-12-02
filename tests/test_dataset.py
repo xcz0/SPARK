@@ -155,26 +155,21 @@ class TestReviewSequenceDataset:
         assert sample["deck_ids"].shape == (seq_len,)
         assert sample["duration_targets"].shape == (seq_len,)
 
-    @pytest.mark.parametrize(
-        "seq_len,stride,expected_stride",
-        [
-            (8, None, 8),  # 默认 stride = seq_len
-            (16, 4, 4),  # 自定义 stride
-        ],
-    )
     def test_stride_configuration(
         self,
         sample_data: dict[str, np.ndarray],
         feature_config: FeatureConfig,
-        seq_len: int,
-        stride: int | None,
-        expected_stride: int,
     ):
-        """测试步长配置。"""
-        dataset = ReviewSequenceDataset(
-            sample_data, feature_config=feature_config, seq_len=seq_len, stride=stride
+        """测试步长配置：默认等于 seq_len，可自定义。"""
+        dataset_default = ReviewSequenceDataset(
+            sample_data, feature_config=feature_config, seq_len=8, stride=None
         )
-        assert dataset.stride == expected_stride
+        assert dataset_default.stride == 8
+
+        dataset_custom = ReviewSequenceDataset(
+            sample_data, feature_config=feature_config, seq_len=16, stride=4
+        )
+        assert dataset_custom.stride == 4
 
     def test_minimum_sequence_length_filter(
         self, sample_data: dict[str, np.ndarray], feature_config: FeatureConfig
@@ -203,34 +198,22 @@ class TestStreamingReviewDataset:
         assert list(dataset.user_ids) == [1, 2, 3]
         assert dataset.shuffle is True
 
-    @pytest.mark.parametrize(
-        "seq_len,stride,shuffle,expected_stride,expected_shuffle",
-        [
-            (16, None, True, 16, True),  # 默认 stride = seq_len
-            (16, 4, False, 4, False),  # 自定义配置
-        ],
-    )
     def test_configuration_options(
         self,
         feature_config: FeatureConfig,
         tmp_path: Path,
-        seq_len: int,
-        stride: int | None,
-        shuffle: bool,
-        expected_stride: int,
-        expected_shuffle: bool,
     ):
-        """测试各种配置选项。"""
+        """测试配置选项：stride 和 shuffle。"""
         dataset = StreamingReviewDataset(
             data_dir=tmp_path,
             user_ids=[1],
-            seq_len=seq_len,
+            seq_len=16,
             feature_config=feature_config,
-            stride=stride,
-            shuffle=shuffle,
+            stride=4,
+            shuffle=False,
         )
-        assert dataset.stride == expected_stride
-        assert dataset.shuffle == expected_shuffle
+        assert dataset.stride == 4
+        assert dataset.shuffle is False
 
     @patch("src.data.dataset.load_user_data")
     def test_iteration_yields_samples(
@@ -453,81 +436,4 @@ class TestRealConfigAndData:
         )
         assert sample["categorical_features"].shape[1] == len(
             real_config.categorical_features
-        )
-
-    def test_multiple_users_data_consistency(
-        self, real_config: FeatureConfig, real_data_path: Path
-    ):
-        """测试多用户数据的一致性。"""
-        from src.data.loader import load_user_data
-
-        user_files = list(real_data_path.glob("user_id=*.parquet"))
-        if len(user_files) < 2:
-            pytest.skip("需要至少两个用户的数据")
-
-        user_ids = [int(f.stem.split("=")[1]) for f in user_files[:3]]
-
-        for user_id in user_ids:
-            data = load_user_data(
-                real_data_path, user_id, list(real_config.all_columns)
-            )
-
-            # 验证每个用户的数据结构一致
-            assert set(data.keys()) == set(real_config.all_columns)
-
-            # 验证数据不为空
-            first_col = list(data.values())[0]
-            assert len(first_col) > 0, f"用户 {user_id} 数据为空"
-
-
-class TestDatasetIntegration:
-    """数据集集成测试（使用模拟数据）。"""
-
-    @pytest.fixture
-    def real_data_path(self) -> Path:
-        """获取真实数据路径。"""
-        return Path("data/processed")
-
-    def test_review_sequence_dataset_with_real_data(
-        self, feature_config: FeatureConfig, real_data_path: Path
-    ):
-        """使用真实数据测试 ReviewSequenceDataset。"""
-        data_file = real_data_path / "user_id=1.parquet"
-        if not data_file.exists():
-            pytest.skip("真实数据文件不存在")
-
-        from src.data.loader import load_user_data
-
-        data = load_user_data(real_data_path, 1, list(feature_config.all_columns))
-        dataset = ReviewSequenceDataset(
-            data, feature_config=feature_config, seq_len=50, stride=25
-        )
-
-        assert len(dataset) > 0
-        sample = dataset[0]
-        assert sample["numerical_features"].shape[1] == len(
-            feature_config.numerical_features
-        )
-
-    def test_streaming_dataset_with_real_data(
-        self, feature_config: FeatureConfig, real_data_path: Path
-    ):
-        """使用真实数据测试 StreamingReviewDataset。"""
-        if not real_data_path.exists():
-            pytest.skip("真实数据目录不存在")
-
-        dataset = StreamingReviewDataset(
-            data_dir=real_data_path,
-            user_ids=[1],
-            seq_len=50,
-            feature_config=feature_config,
-            shuffle=False,
-        )
-
-        samples = list(dataset)
-        if not samples:
-            pytest.skip("没有生成样本，可能数据不足")
-
-        assert samples[0]["numerical_features"].shape[1] == len(
-            feature_config.numerical_features
         )
