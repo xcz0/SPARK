@@ -17,6 +17,7 @@ logging.basicConfig(
 
 RAW_DATA_DIR = Path("./data/raw/")
 OUTPUT_DIR = Path("./data/processed/")
+FILL_LARGE_VALUE = 1e6
 
 
 @dataclass
@@ -75,10 +76,10 @@ def summarize_data(
     elapsed_seconds_clipped = log_data["elapsed_seconds"].clip(lower=0)
     elapsed_days_clipped = log_data["elapsed_days"].clip(lower=0)
     log_data["log_elapsed_seconds"] = np.where(
-        is_first_review, np.inf, np.log1p(elapsed_seconds_clipped)
+        is_first_review, FILL_LARGE_VALUE, np.log1p(elapsed_seconds_clipped)
     )
     log_data["log_elapsed_days"] = np.where(
-        is_first_review, np.inf, np.log1p(elapsed_days_clipped)
+        is_first_review, FILL_LARGE_VALUE, np.log1p(elapsed_days_clipped)
     )
 
     # 显式历史特征 - 该卡片上一次复习的评分和耗时
@@ -86,13 +87,13 @@ def summarize_data(
         card_group["rating"].shift(1).fillna(0).astype("int8")
     )
     log_data["log_last_duration_on_card"] = (
-        card_group["log_duration"].shift(1).fillna(np.inf)
+        card_group["log_duration"].shift(1).fillna(FILL_LARGE_VALUE)
     )
 
     # Session 上下文特征 - 全局序列上一次复习的信息
     log_data["prev_review_rating"] = rating.shift(1).fillna(0).astype("int8")
     log_data["log_prev_review_duration"] = (
-        log_data["log_duration"].shift(1).fillna(np.inf)
+        log_data["log_duration"].shift(1).fillna(FILL_LARGE_VALUE)
     )
     log_data["same_card_as_prev"] = log_data["card_id"] == log_data["card_id"].shift(1)
 
