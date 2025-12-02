@@ -18,6 +18,7 @@ logging.basicConfig(
 RAW_DATA_DIR = Path("./data/raw/")
 OUTPUT_DIR = Path("./data/processed/")
 FILL_LARGE_VALUE = 1e6
+USER_AMOUNT = 5
 
 
 @dataclass
@@ -52,7 +53,9 @@ def summarize_data(
     card_group = log_data.groupby("card_id", sort=False)
 
     # 对每个 day_offset 分组,累计 duration(不包含当前行)
-    log_data["time_spent_today"] = day_group["duration"].cumsum().shift(1, fill_value=0)
+    log_data["time_spent_today"] = day_group["duration"].transform(
+        lambda x: x.cumsum().shift(fill_value=0)
+    )
     # 这是今天复习的第几张卡（同一 day_offset 内的顺序，从 1 开始）
     log_data["card_index_today"] = (day_group.cumcount() + 1).astype("int32")
     log_data["card_review_count"] = card_group.cumcount() + 1
@@ -101,10 +104,10 @@ def summarize_data(
     if card_data is None or card_data.empty:
         log_data["deck_id"] = 0
     else:
-        log_data = log_data.merge(
-            card_data[["card_id", "deck_id"]], on="card_id", how="left"
+        deck_mapping = card_data.set_index("card_id")["deck_id"]
+        log_data["deck_id"] = (
+            log_data["card_id"].map(deck_mapping).fillna(-1).astype("int32") + 1
         )
-        log_data["deck_id"] = log_data["deck_id"].fillna(0).astype("int32")
 
     log_data["is_correct"] = (log_data["rating"] > 1).astype("int8")
 
@@ -262,8 +265,8 @@ if __name__ == "__main__":
     with Pool(num_workers) as pool:
         results: list[ProcessResult] = list(
             tqdm(
-                pool.imap_unordered(process_func, range(1, 10001)),
-                total=10000,
+                pool.imap_unordered(process_func, range(1, USER_AMOUNT + 1)),
+                total=USER_AMOUNT,
                 desc="处理用户数据",
                 unit="user",
             )
