@@ -11,11 +11,12 @@ dependencies = [
     "torch",
     "wandb",
     "loguru",
-    "h5py",
+    "einops",
 ]
 
 [dependency-groups]
 dev = [
+    "pytest",
     "huggingface-hub",
     "ipykernel",
     "jupyter",
