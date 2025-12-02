@@ -2,7 +2,6 @@
 
 from pathlib import Path
 
-import pandas as pd
 import pyarrow.parquet as pq
 import numpy as np
 
@@ -23,15 +22,22 @@ def load_user_data(
     }
 
 
-def load_all_users_data(data_dir: Path | str) -> pd.DataFrame:
+def load_all_users_data(
+    data_dir: Path | str, columns: list[str]
+) -> dict[str, np.ndarray]:
     """加载所有用户的数据。
 
     Args:
         data_dir: 数据目录路径
+        columns: 需要加载的列名列表
 
     Returns:
-        所有用户的复习记录 DataFrame
+        包含所有用户数据的字典，键为列名，值为 numpy 数组
     """
     data_dir = Path(data_dir)
-    parquet_files = sorted(data_dir.glob("user_id=*.parquet"))
-    return pd.concat((pd.read_parquet(f) for f in parquet_files), ignore_index=True)
+    parquet_files = list(data_dir.glob("*.parquet"))
+    table = pq.read_table(parquet_files, columns=columns)
+
+    return {
+        name: col.to_numpy() for name, col in zip(table.column_names, table.columns)
+    }
