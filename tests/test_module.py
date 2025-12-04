@@ -70,16 +70,6 @@ def test_training_step_runs_backward(
     assert grads_exist
 
 
-def test_flatten_with_mask_respects_boolean_mask(spark_module: SPARKModule):
-    """_flatten_with_mask should keep only the True positions."""
-    tensor = torch.arange(6, dtype=torch.float32).view(2, 3)
-    mask = torch.tensor([[True, False, True], [False, True, False]])
-
-    flattened = spark_module._flatten_with_mask(tensor, mask)
-
-    assert torch.equal(flattened, torch.tensor([0.0, 2.0, 4.0]))
-
-
 def test_configure_optimizers_returns_scheduler(spark_module: SPARKModule):
     """configure_optimizers should yield both optimizer and scheduler settings."""
     config = spark_module.configure_optimizers()

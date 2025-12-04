@@ -151,23 +151,6 @@ class SPARKModule(LightningModule):
             padding_mask=batch["padding_mask"],
         )
 
-    def _flatten_with_mask(self, tensor: Tensor, mask: Tensor | None) -> Tensor:
-        """将张量展平并应用掩码。
-
-        Args:
-            tensor: 输入张量 (batch, seq_len, ...) 或 (batch, seq_len)
-            mask: 掩码张量 (batch, seq_len)
-
-        Returns:
-            展平后的张量
-        """
-        flat = tensor.flatten(end_dim=1) if tensor.dim() > 2 else tensor.flatten()
-
-        if mask is None:
-            return flat
-
-        return flat[mask.flatten()]
-
     def _compute_step(
         self,
         batch: dict[str, Tensor],
@@ -219,10 +202,10 @@ class SPARKModule(LightningModule):
         )
 
         # 展平张量用于指标计算
-        rating_probs_flat = self._flatten_with_mask(outputs["rating_probs"], mask)
-        ordinal_targets_flat = self._flatten_with_mask(batch["ordinal_targets"], mask)
-        duration_pred_flat = self._flatten_with_mask(outputs["duration_pred"], mask)
-        duration_target_flat = self._flatten_with_mask(batch["duration_targets"], mask)
+        rating_probs_flat = outputs["rating_probs"][mask]
+        ordinal_targets_flat = batch["ordinal_targets"][mask]
+        duration_pred_flat = outputs["duration_pred"][mask]
+        duration_target_flat = batch["duration_targets"][mask]
 
         # 获取对应阶段的指标集合
         rating_metrics = getattr(self, f"{stage}_rating_metrics")
@@ -230,22 +213,16 @@ class SPARKModule(LightningModule):
 
         targets_for_metrics = ordinal_targets_flat.int()
 
+        # 更新指标状态
         rating_metrics.update(rating_probs_flat, targets_for_metrics)
         duration_metrics.update(duration_pred_flat, duration_target_flat)
 
         # 记录指标
-        self.log_dict(
-            rating_metrics.compute(),
-            prog_bar=False,
-            sync_dist=True,
-            batch_size=batch_size,
-        )
-        self.log_dict(
-            duration_metrics.compute(),
-            prog_bar=False,
-            sync_dist=True,
-            batch_size=batch_size,
-        )
+        for name, metric in rating_metrics.items():
+            self.log(name, metric, on_step=False, on_epoch=True, batch_size=batch_size)
+
+        for name, metric in duration_metrics.items():
+            self.log(name, metric, on_step=False, on_epoch=True, batch_size=batch_size)
 
         # 计算并记录 recall 相关指标 (仅验证和测试)
         if stage in ["val", "test"]:
@@ -264,12 +241,11 @@ class SPARKModule(LightningModule):
             # AUC Metric
             recall_metrics = getattr(self, f"{stage}_recall_metrics")
             recall_metrics.update(prob_correct, target_correct.int())
-            self.log_dict(
-                recall_metrics.compute(),
-                prog_bar=False,
-                sync_dist=True,
-                batch_size=batch_size,
-            )
+
+            for name, metric in recall_metrics.items():
+                self.log(
+                    name, metric, on_step=False, on_epoch=True, batch_size=batch_size
+                )
 
         return losses
 
@@ -288,23 +264,6 @@ class SPARKModule(LightningModule):
         """测试步骤。"""
         outputs = self(batch)
         self._compute_step(batch, outputs, "test")
-
-    def on_train_epoch_end(self) -> None:
-        """训练 epoch 结束时重置指标。"""
-        self.train_rating_metrics.reset()
-        self.train_duration_metrics.reset()
-
-    def on_validation_epoch_end(self) -> None:
-        """验证 epoch 结束时重置指标。"""
-        self.val_rating_metrics.reset()
-        self.val_duration_metrics.reset()
-        self.val_recall_metrics.reset()
-
-    def on_test_epoch_end(self) -> None:
-        """测试 epoch 结束时重置指标。"""
-        self.test_rating_metrics.reset()
-        self.test_duration_metrics.reset()
-        self.test_recall_metrics.reset()
 
     def configure_optimizers(self) -> dict[str, Any]:
         """配置优化器和学习率调度器。"""
