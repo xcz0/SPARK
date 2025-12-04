@@ -1,0 +1,51 @@
+# Data configuration
+data:
+  raw_dir: "data/raw"
+  processed_dir: "data/processed"
+  batch_size: 8
+  window_size: 50
+  stride: null  # 滑动窗口步长，null 表示等于 window_size（无重叠）
+  num_workers: 2
+  pin_memory: false
+  train_ratio: 0.8
+  val_ratio: 0.1
+  streaming: false  # 是否使用流式加载模式
+  seed: 42
+
+# Feature configuration
+features:
+  # 数值特征流 (Numerical Stream)
+  numerical_features:
+    - log_elapsed_seconds
+    - log_elapsed_days
+    - log_time_spent_today
+    - log_prev_review_duration
+    - log_last_duration_on_card
+    - card_index_today
+    - card_review_count
+
+  # 类别特征流 (Categorical Stream)
+  categorical_features:
+    - state
+    - prev_review_rating
+    - last_rating_on_card
+
+  # 类别特征词表大小
+  categorical_vocab_sizes:
+    state: 4
+    prev_review_rating: 5
+    last_rating_on_card: 5
+
+  # 时间特征 (用于 Time2Vec 编码)
+  time_feature: day_offset
+
+  # ID 特征 (用于构建 Attention Mask)
+  card_id_feature: card_id
+  deck_id_feature: deck_id
+
+  # 目标特征
+  ordinal_targets:
+    - rating_gt1
+    - rating_gt2
+    - rating_gt3
+  duration_target: log_duration
