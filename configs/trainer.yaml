@@ -1,5 +1,6 @@
 # Trainer configuration (PyTorch Lightning)
 trainer:
+  default_root_dir: /home/xcz/Space-Repetition/pred/outputs  # 默认输出目录
   # 训练控制
   max_epochs: 200             # 最大训练轮数
   precision: 32              # 训练精度 (16, 32, bf16)

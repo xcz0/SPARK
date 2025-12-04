@@ -1,8 +1,8 @@
 # Data configuration
 data:
   # 数据路径
-  raw_dir: "data/raw"
-  processed_dir: "data/processed"
+  raw_dir: "/home/xcz/Space-Repetition/data/raw"
+  processed_dir: "/home/xcz/Space-Repetition/data/processed"
   
   # DataLoader 参数
   batch_size: 8              # 批次大小

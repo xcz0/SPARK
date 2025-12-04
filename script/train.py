@@ -78,7 +78,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=PROJECT_ROOT / "outputs",
+        default=None,
         help="输出目录（模型检查点、日志等）",
     )
 
@@ -148,8 +148,16 @@ def main() -> None:
     max_epochs = args.epochs or trainer_config.get("max_epochs", 20)
     learning_rate = args.lr or 1e-4
 
+    # 确定输出目录
+    if args.output_dir:
+        output_dir = args.output_dir
+    elif "default_root_dir" in trainer_config:
+        output_dir = Path(trainer_config["default_root_dir"])
+    else:
+        output_dir = PROJECT_ROOT / "outputs"
+
     # 创建输出目录
-    args.output_dir.mkdir(parents=True, exist_ok=True)
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     # 构建数据模块覆盖参数
     data_overrides = {}
@@ -169,7 +177,7 @@ def main() -> None:
     logger.info("SPARK 模型训练")
     logger.info("=" * 60)
     logger.info(f"数据目录: {data_module.data_dir}")
-    logger.info(f"输出目录: {args.output_dir}")
+    logger.info(f"输出目录: {output_dir}")
     logger.info(f"批次大小: {data_module.hparams.batch_size}")
     logger.info(f"序列长度: {data_module.hparams.seq_len}")
     logger.info(f"模型维度: {d_model}")
@@ -208,7 +216,7 @@ def main() -> None:
     # 配置回调
     callbacks = [
         ModelCheckpoint(
-            dirpath=args.output_dir / "checkpoints",
+            dirpath=output_dir / "checkpoints",
             filename="spark-{epoch:02d}-{val/loss:.4f}",
             monitor="val/loss",
             mode="min",
@@ -230,7 +238,7 @@ def main() -> None:
 
     # 使用 TensorBoard 记录日志
     tb_logger = TensorBoardLogger(
-        save_dir=args.output_dir,
+        save_dir=output_dir,
         name="lightning_logs",
     )
     loggers.append(tb_logger)
@@ -243,7 +251,7 @@ def main() -> None:
         precision=str(trainer_config.get("precision", 32)),
         callbacks=callbacks,
         logger=loggers if loggers else None,
-        default_root_dir=args.output_dir,
+        default_root_dir=output_dir,
         gradient_clip_val=trainer_config.get("gradient_clip_val", 1.0),
         accumulate_grad_batches=trainer_config.get("accumulate_grad_batches", 1),
         val_check_interval=trainer_config.get("val_check_interval", 1.0),
@@ -264,7 +272,7 @@ def main() -> None:
     trainer.test(model, datamodule=data_module)
 
     # 保存最终模型
-    final_model_path = args.output_dir / "final_model.ckpt"
+    final_model_path = output_dir / "final_model.ckpt"
     trainer.save_checkpoint(final_model_path)
     logger.info(f"最终模型已保存至: {final_model_path}")
 
