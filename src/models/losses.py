@@ -23,17 +23,16 @@ def _reduce_loss(loss: Tensor, mask: Tensor | None, reduction: str) -> Tensor:
     """
     if mask is not None:
         loss = loss * mask.float()
-        if reduction == "mean":
-            return loss.sum() / mask.float().sum().clamp(min=1.0)
-        if reduction == "sum":
-            return loss.sum()
-        return loss
 
-    if reduction == "mean":
-        return loss.mean()
-    if reduction == "sum":
-        return loss.sum()
-    return loss
+    match reduction:
+        case "mean":
+            if mask is not None:
+                return loss.sum() / mask.float().sum().clamp(min=1.0)
+            return loss.mean()
+        case "sum":
+            return loss.sum()
+        case _:
+            return loss
 
 
 class CORALLoss(Module):

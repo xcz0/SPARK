@@ -9,7 +9,6 @@ from src.models.losses import (
     DurationLoss,
     _reduce_loss,
 )
-from src.models import CoralOrdinalLoss  # 从 __init__ 导入向后兼容别名
 
 
 class TestReduceLoss:
@@ -319,21 +318,6 @@ class TestCombinedLoss:
         state_dict = loss_fn.state_dict()
         assert "rating_weight" in state_dict
         assert "duration_weight" in state_dict
-
-
-class TestBackwardCompatibility:
-    """测试向后兼容性。"""
-
-    def test_coral_ordinal_loss_alias(self):
-        """测试 CoralOrdinalLoss 别名。"""
-        assert CoralOrdinalLoss is CORALLoss
-
-        loss_fn = CoralOrdinalLoss()
-        probs = torch.sigmoid(torch.randn(2, 4, 3))
-        targets = torch.rand(2, 4, 3)
-
-        loss = loss_fn(probs, targets)
-        assert not torch.isnan(loss)
 
 
 class TestLossDevicePlacement:

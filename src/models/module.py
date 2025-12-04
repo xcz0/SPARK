@@ -151,11 +151,11 @@ class SPARKModule(LightningModule):
         Returns:
             展平后的张量
         """
-        # 展平到 (batch * seq_len, ...) 或 (batch * seq_len,)
         flat = tensor.flatten(end_dim=1) if tensor.dim() > 2 else tensor.flatten()
 
         if mask is None:
             return flat
+
         return flat[mask.flatten()]
 
     def _compute_step(
@@ -244,16 +244,17 @@ class SPARKModule(LightningModule):
 
     def configure_optimizers(self) -> dict[str, Any]:
         """配置优化器和学习率调度器。"""
+        hparams = self.hparams
         optimizer = torch.optim.AdamW(
             self.parameters(),
-            lr=self.hparams.learning_rate,
-            weight_decay=self.hparams.weight_decay,
+            lr=hparams["learning_rate"],
+            weight_decay=hparams["weight_decay"],
         )
 
         # 使用带预热的余弦退火调度器
         scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
             optimizer,
-            T_0=self.hparams.warmup_steps,
+            T_0=hparams["warmup_steps"],
             T_mult=2,
         )
 
