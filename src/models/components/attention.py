@@ -7,6 +7,8 @@
 - 组 C: 全局上下文头 (Global Context Heads)
 """
 
+from typing import Any
+
 import torch
 from einops import rearrange, repeat
 from torch.nn import Module, Parameter, MultiheadAttention
@@ -106,6 +108,27 @@ class DifferentialMultiHeadAttention(Module):
 
         # 时间衰减偏置（仅用于 Card Heads）
         self.time_decay = TimeDecayBias(self.n_card_heads)
+        self._mask_cache: dict[str, dict[str, Any]] = {}
+
+    def _get_additive_mask(
+        self,
+        name: str,
+        mask: Tensor,
+        device: torch.device,
+        dtype: torch.dtype,
+    ) -> Tensor:
+        """将布尔掩码转换为加性掩码并缓存结果。"""
+
+        signature = (mask.data_ptr(), mask.shape, device, dtype)
+        cache = self._mask_cache.get(name)
+        if cache and cache["signature"] == signature:
+            return cache["value"]
+
+        mask_device = mask.to(device)
+        additive = torch.zeros(mask_device.shape, dtype=dtype, device=device)
+        additive.masked_fill_(~mask_device, float("-inf"))
+        self._mask_cache[name] = {"signature": signature, "value": additive}
+        return additive
 
     def forward(
         self,
@@ -130,6 +153,8 @@ class DifferentialMultiHeadAttention(Module):
             (batch, seq_len, d_model) 输出
         """
         batch_size, seq_len, _ = x.shape
+        device = x.device
+        dtype = x.dtype
 
         # 扩展因果掩码到批次维度
         causal_mask = repeat(
@@ -143,19 +168,13 @@ class DifferentialMultiHeadAttention(Module):
             card_mask = card_mask & padding_mask_2d
             deck_mask = deck_mask & padding_mask_2d
 
-        # 转换掩码为加性掩码 (0 或 -inf)
-        def to_additive(mask):
-            return torch.zeros_like(mask, dtype=x.dtype).masked_fill(
-                ~mask, float("-inf")
-            )
-
-        card_attn_mask = to_additive(card_mask)
-        deck_attn_mask = to_additive(deck_mask)
-        causal_attn_mask = to_additive(causal_mask)
+        card_attn_mask = self._get_additive_mask("card", card_mask, device, dtype)
+        deck_attn_mask = self._get_additive_mask("deck", deck_mask, device, dtype)
+        causal_attn_mask = self._get_additive_mask("causal", causal_mask, device, dtype)
 
         # === Card Heads Mask ===
         # 时间衰减偏置: (batch, n_card_heads, seq_len, seq_len)
-        time_bias = self.time_decay(time_diff)
+        time_bias = self.time_decay(time_diff.to(device)).to(dtype)
         # 广播 card_attn_mask: (batch, 1, seq_len, seq_len)
         card_attn_mask = card_attn_mask.unsqueeze(1) + time_bias
 
