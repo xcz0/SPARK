@@ -185,10 +185,28 @@ class SPARKModule(LightningModule):
             mask=mask,
         )
 
+        batch_size = batch["numerical_features"].size(0)
+
         # 记录损失
-        self.log(f"{stage}/loss", losses["total"], prog_bar=True, sync_dist=True)
-        self.log(f"{stage}/rating_loss", losses["rating"], sync_dist=True)
-        self.log(f"{stage}/duration_loss", losses["duration"], sync_dist=True)
+        self.log(
+            f"{stage}/loss",
+            losses["total"],
+            prog_bar=True,
+            sync_dist=True,
+            batch_size=batch_size,
+        )
+        self.log(
+            f"{stage}/rating_loss",
+            losses["rating"],
+            sync_dist=True,
+            batch_size=batch_size,
+        )
+        self.log(
+            f"{stage}/duration_loss",
+            losses["duration"],
+            sync_dist=True,
+            batch_size=batch_size,
+        )
 
         # 展平张量用于指标计算
         rating_probs_flat = self._flatten_with_mask(outputs["rating_probs"], mask)
@@ -206,8 +224,18 @@ class SPARKModule(LightningModule):
         duration_metrics.update(duration_pred_flat, duration_target_flat)
 
         # 记录指标
-        self.log_dict(rating_metrics.compute(), prog_bar=False, sync_dist=True)
-        self.log_dict(duration_metrics.compute(), prog_bar=False, sync_dist=True)
+        self.log_dict(
+            rating_metrics.compute(),
+            prog_bar=False,
+            sync_dist=True,
+            batch_size=batch_size,
+        )
+        self.log_dict(
+            duration_metrics.compute(),
+            prog_bar=False,
+            sync_dist=True,
+            batch_size=batch_size,
+        )
 
         return losses
 
