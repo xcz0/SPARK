@@ -87,6 +87,18 @@ class CORALHead(Module):
         # 期望 = 1 + sum(P(y > k))
         return 1.0 + probs.sum(dim=-1)
 
+    def predict_correct(self, x: Tensor) -> Tensor:
+        """预测回忆正确（评分大于1）的概率，即输出的第一个概率
+
+        Args:
+            x: (batch, seq_len, d_model) 输入特征
+
+        Returns:
+            (batch, seq_len) 预测回忆正确（评分大于1）
+        """
+        probs = self.forward(x)  # (batch, seq_len, num_thresholds)
+        return probs[..., 0]  # P(y > 1)
+
 
 class DurationHead(Module):
     """耗时预测头。

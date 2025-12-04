@@ -9,10 +9,11 @@
 from typing import Any
 
 import torch
+import torch.nn.functional as F
 from torch import Tensor
 from lightning import LightningModule
 from torchmetrics import MetricCollection, MeanAbsoluteError, MeanSquaredError
-from torchmetrics.classification import MultilabelAccuracy, MultilabelAUROC
+from torchmetrics.classification import MultilabelAccuracy, MultilabelAUROC, BinaryAUROC
 
 from .architecture import ModelConfig, SPARKModel
 from .losses import CombinedLoss
@@ -120,6 +121,15 @@ class SPARKModule(LightningModule):
         self.train_duration_metrics = duration_metrics.clone(prefix="train/duration_")
         self.val_duration_metrics = duration_metrics.clone(prefix="val/duration_")
         self.test_duration_metrics = duration_metrics.clone(prefix="test/duration_")
+
+        # 回忆（正确/错误）相关指标
+        recall_metrics = MetricCollection(
+            {
+                "recall_auc": BinaryAUROC(),
+            }
+        )
+        self.val_recall_metrics = recall_metrics.clone(prefix="val/")
+        self.test_recall_metrics = recall_metrics.clone(prefix="test/")
 
     def forward(self, batch: dict[str, Tensor]) -> dict[str, Tensor]:
         """前向传播。
@@ -237,6 +247,30 @@ class SPARKModule(LightningModule):
             batch_size=batch_size,
         )
 
+        # 计算并记录 recall 相关指标 (仅验证和测试)
+        if stage in ["val", "test"]:
+            prob_correct = rating_probs_flat[:, 0]
+            target_correct = ordinal_targets_flat[:, 0]
+
+            # BCE Loss
+            recall_bce = F.binary_cross_entropy(prob_correct, target_correct.float())
+            self.log(
+                f"{stage}/recall_bce",
+                recall_bce,
+                sync_dist=True,
+                batch_size=batch_size,
+            )
+
+            # AUC Metric
+            recall_metrics = getattr(self, f"{stage}_recall_metrics")
+            recall_metrics.update(prob_correct, target_correct.int())
+            self.log_dict(
+                recall_metrics.compute(),
+                prog_bar=False,
+                sync_dist=True,
+                batch_size=batch_size,
+            )
+
         return losses
 
     def training_step(self, batch: dict[str, Tensor], batch_idx: int) -> Tensor:
@@ -264,11 +298,13 @@ class SPARKModule(LightningModule):
         """验证 epoch 结束时重置指标。"""
         self.val_rating_metrics.reset()
         self.val_duration_metrics.reset()
+        self.val_recall_metrics.reset()
 
     def on_test_epoch_end(self) -> None:
         """测试 epoch 结束时重置指标。"""
         self.test_rating_metrics.reset()
         self.test_duration_metrics.reset()
+        self.test_recall_metrics.reset()
 
     def configure_optimizers(self) -> dict[str, Any]:
         """配置优化器和学习率调度器。"""

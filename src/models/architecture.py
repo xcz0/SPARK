@@ -272,3 +272,8 @@ class SPARKModel(Module):
         """根据已计算的 rating 概率计算期望评分。"""
 
         return 1.0 + rating_probs.sum(dim=-1)
+
+    def predict_correct(self, rating_probs: Tensor) -> Tensor:
+        """根据已计算的 rating 概率预测回忆正确（评分大于1）的概率。"""
+
+        return rating_probs[..., 0]
