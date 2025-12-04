@@ -12,7 +12,6 @@ from torch.nn import (
     Linear,
     Embedding,
     Parameter,
-    ModuleDict,
     Sequential,
     GELU,
     Dropout,
