@@ -211,5 +211,6 @@ __marimo__/
 /logs/
 # Directory for storing log files
 /models/
+/outputs/
 # Directory for storing model files 
 *.ipynb 
