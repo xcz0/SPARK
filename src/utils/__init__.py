@@ -24,8 +24,6 @@ from .masking import (
 )
 from .metrics import OrdinalAccuracy, ordinal_accuracy, rmse
 
-# 向后兼容别名：使用 torchmetrics 内置的 RMSE
-MaskedRMSE = lambda **kwargs: MeanSquaredError(squared=False, **kwargs)
 
 __all__ = [
     # 基础掩码函数
@@ -42,7 +40,6 @@ __all__ = [
     "create_time_diff_matrix",
     # 指标类
     "OrdinalAccuracy",
-    "MaskedRMSE",  # 向后兼容别名
     # 函数式指标
     "rmse",
     "ordinal_accuracy",

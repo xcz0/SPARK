@@ -5,7 +5,6 @@ import torch
 from torchmetrics import MeanSquaredError
 
 from src.utils.metrics import OrdinalAccuracy, ordinal_accuracy, rmse
-from src.utils import MaskedRMSE
 
 
 class TestOrdinalAccuracy:
@@ -115,69 +114,6 @@ class TestOrdinalAccuracy:
         assert result.item() == pytest.approx(0.0)
 
 
-class TestMaskedRMSE:
-    """测试 MaskedRMSE 指标类（使用 torchmetrics.MeanSquaredError）。"""
-
-    def test_perfect_predictions(self):
-        """测试完美预测场景。"""
-        metric = MaskedRMSE()
-        preds = torch.tensor([1.0, 2.0, 3.0])
-        targets = torch.tensor([1.0, 2.0, 3.0])
-
-        metric.update(preds, targets)
-        result = metric.compute()
-
-        assert result.item() == pytest.approx(0.0, abs=1e-6)
-
-    def test_basic_rmse(self):
-        """测试基本 RMSE 计算。"""
-        metric = MaskedRMSE()
-        preds = torch.tensor([1.0, 2.0, 3.0, 4.0])
-        targets = torch.tensor([2.0, 2.0, 2.0, 2.0])
-
-        metric.update(preds, targets)
-        result = metric.compute()
-
-        # RMSE = sqrt((1+0+1+4)/4) = sqrt(1.5)
-        expected = torch.sqrt(torch.tensor(1.5))
-        assert result.item() == pytest.approx(expected.item(), rel=1e-5)
-
-    def test_multiple_updates(self):
-        """测试多次更新累积。"""
-        metric = MaskedRMSE()
-
-        metric.update(torch.tensor([0.0, 2.0]), torch.tensor([1.0, 1.0]))
-        metric.update(torch.tensor([1.0, 3.0]), torch.tensor([1.0, 1.0]))
-
-        result = metric.compute()
-        # 总误差: 1+1+0+4 = 6, 总数: 4
-        # RMSE = sqrt(6/4) = sqrt(1.5)
-        expected = torch.sqrt(torch.tensor(1.5))
-        assert result.item() == pytest.approx(expected.item(), rel=1e-5)
-
-    def test_reset(self):
-        """测试重置功能。"""
-        metric = MaskedRMSE()
-
-        metric.update(torch.tensor([0.0, 0.0]), torch.tensor([10.0, 10.0]))
-        metric.reset()
-        metric.update(torch.tensor([1.0]), torch.tensor([1.0]))
-
-        result = metric.compute()
-        assert result.item() == pytest.approx(0.0, abs=1e-6)
-
-    def test_2d_tensors(self):
-        """测试 2D 张量。"""
-        metric = MaskedRMSE()
-        preds = torch.tensor([[1.0, 2.0], [3.0, 4.0]])
-        targets = torch.tensor([[1.0, 2.0], [3.0, 4.0]])
-
-        metric.update(preds, targets)
-        result = metric.compute()
-
-        assert result.item() == pytest.approx(0.0, abs=1e-6)
-
-
 class TestRMSEFunctional:
     """测试 rmse 函数式接口。"""
 
@@ -265,35 +201,12 @@ class TestMetricDevicePlacement:
 
         assert result.device == torch.device("cpu")
 
-    def test_rmse_cpu(self):
-        """测试 RMSE 在 CPU 上。"""
-        metric = MaskedRMSE()
-        preds = torch.tensor([1.0, 2.0])
-        targets = torch.tensor([1.0, 2.0])
-
-        metric.update(preds, targets)
-        result = metric.compute()
-
-        assert result.device == torch.device("cpu")
-
     @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA not available")
     def test_ordinal_accuracy_cuda(self):
         """测试 OrdinalAccuracy 在 CUDA 上。"""
         metric = OrdinalAccuracy().cuda()
         preds = torch.tensor([1, 2, 3]).cuda()
         targets = torch.tensor([1, 2, 3]).cuda()
-
-        metric.update(preds, targets)
-        result = metric.compute()
-
-        assert result.device.type == "cuda"
-
-    @pytest.mark.skipif(not torch.cuda.is_available(), reason="CUDA not available")
-    def test_rmse_cuda(self):
-        """测试 RMSE 在 CUDA 上。"""
-        metric = MaskedRMSE().cuda()
-        preds = torch.tensor([1.0, 2.0]).cuda()
-        targets = torch.tensor([1.0, 2.0]).cuda()
 
         metric.update(preds, targets)
         result = metric.compute()
