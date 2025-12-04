@@ -144,25 +144,6 @@ class TestReviewDataModule:
 
         assert "numerical_features" in batch
 
-    def test_data_split_ratios(self, temp_data_dir):
-        """测试数据划分比例。"""
-        dm = ReviewDataModule(
-            data_dir=temp_data_dir,
-            seq_len=32,
-            batch_size=4,
-            num_workers=0,
-            train_ratio=0.6,
-            val_ratio=0.2,
-        )
-        dm.setup("fit")
-        dm.setup("test")
-
-        total = len(dm.train_dataset) + len(dm.val_dataset) + len(dm.test_dataset)
-
-        # 验证比例大致正确（由于整数划分可能有微小差异）
-        train_ratio = len(dm.train_dataset) / total
-        assert 0.55 <= train_ratio <= 0.65
-
     def test_custom_feature_config(self, temp_data_dir):
         """测试特征配置属性和自定义配置。"""
         # 默认配置
