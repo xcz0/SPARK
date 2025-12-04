@@ -6,7 +6,7 @@ import torch
 from torch.utils.data import DataLoader
 
 from .data import ReviewSequenceDataset, ReviewCollator
-from src.models import SPARKModel
+from .models import SPARKModel
 
 
 def _ensure_device(device: torch.device | str) -> torch.device:

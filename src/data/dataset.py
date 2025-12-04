@@ -13,8 +13,8 @@ import torch
 from torch import Tensor
 from torch.utils.data import Dataset, IterableDataset, get_worker_info
 
-from src.data.config import DEFAULT_FEATURE_CONFIG, FeatureConfig
-from src.data.loader import load_user_data
+from .config import DEFAULT_FEATURE_CONFIG, FeatureConfig
+from .loader import load_user_data
 
 
 class ReviewSequenceDataset(Dataset):

@@ -4,8 +4,8 @@ import torch
 from torch import Tensor
 from torch.nn.utils.rnn import pad_sequence
 
-from src.data.config import CollatorConfig
-from src.utils.masking import (
+from .config import CollatorConfig
+from ..utils.masking import (
     create_card_mask,
     create_causal_mask,
     create_deck_mask,
