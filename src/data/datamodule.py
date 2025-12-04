@@ -46,6 +46,7 @@ class ReviewDataModule(LightningDataModule):
         pin_memory: bool = False,
         train_ratio: float = 0.8,
         val_ratio: float = 0.1,
+        test_ratio: float = 0.1,
         feature_config: FeatureConfig | None = None,
         collator_config: CollatorConfig | None = None,
     ):
@@ -60,6 +61,7 @@ class ReviewDataModule(LightningDataModule):
             pin_memory: 是否将数据固定在 GPU 内存
             train_ratio: 训练集比例
             val_ratio: 验证集比例
+            test_ratio: 测试集比例
             feature_config: 特征配置
             collator_config: Collator 配置
             streaming: 是否使用流式加载模式
@@ -67,6 +69,10 @@ class ReviewDataModule(LightningDataModule):
         """
         super().__init__()
         self.save_hyperparameters(ignore=["feature_config", "collator_config"])
+
+        # 如果未指定 stride，则默认等于 seq_len（无重叠）
+        if self.hparams.stride is None:
+            self.hparams.stride = self.hparams.seq_len
 
         self.data_dir = Path(data_dir)
         self.feature_config = feature_config or DEFAULT_FEATURE_CONFIG
@@ -158,9 +164,9 @@ class ReviewDataModule(LightningDataModule):
 
             # 划分数据集
             total_size = len(self._full_dataset)
-            train_size = int(total_size * self.hparams.train_ratio)
             val_size = int(total_size * self.hparams.val_ratio)
-            test_size = total_size - train_size - val_size
+            test_size = int(total_size * self.hparams.test_ratio)
+            train_size = total_size - val_size - test_size
 
             self._dataset_splits = random_split(
                 self._full_dataset,
@@ -260,41 +266,6 @@ class ReviewDataModule(LightningDataModule):
         """返回预测数据加载器。"""
         return self._create_dataloader(self.predict_dataset)
 
-    def state_dict(self) -> dict[str, Any]:
-        """返回数据模块的状态字典，用于检查点保存。"""
-        return {
-            "seed": self.hparams.seed,
-            "train_ratio": self.hparams.train_ratio,
-            "val_ratio": self.hparams.val_ratio,
-        }
-
-    def load_state_dict(self, state_dict: dict[str, Any]) -> None:
-        """从状态字典加载数据模块状态。"""
-        self.hparams.seed = state_dict.get("seed", self.hparams.seed)
-        self.hparams.train_ratio = state_dict.get(
-            "train_ratio", self.hparams.train_ratio
-        )
-        self.hparams.val_ratio = state_dict.get("val_ratio", self.hparams.val_ratio)
-
-    def teardown(self, stage: str) -> None:
-        """清理数据集资源。
-
-        在训练/验证/测试/预测结束后释放内存。
-
-        Args:
-            stage: 当前阶段
-        """
-        match stage:
-            case "fit":
-                self.train_dataset = None
-                self.val_dataset = None
-            case "validate":
-                self.val_dataset = None
-            case "test":
-                self.test_dataset = None
-            case "predict":
-                self.predict_dataset = None
-
     @property
     def num_numerical_features(self) -> int:
         """返回数值特征数量。"""
@@ -309,49 +280,3 @@ class ReviewDataModule(LightningDataModule):
     def categorical_vocab_sizes(self) -> dict[str, int]:
         """返回类别特征的词表大小。"""
         return self.feature_config.categorical_vocab_sizes
-
-    # 以下属性提供对 hparams 的便捷访问
-    @property
-    def seq_len(self) -> int:
-        """返回序列长度。"""
-        return self.hparams.seq_len
-
-    @property
-    def batch_size(self) -> int:
-        """返回批次大小。"""
-        return self.hparams.batch_size
-
-    @property
-    def num_workers(self) -> int:
-        """返回工作进程数。"""
-        return self.hparams.num_workers
-
-    @property
-    def pin_memory(self) -> bool:
-        """返回是否固定内存。"""
-        return self.hparams.pin_memory
-
-    @property
-    def train_ratio(self) -> float:
-        """返回训练集比例。"""
-        return self.hparams.train_ratio
-
-    @property
-    def val_ratio(self) -> float:
-        """返回验证集比例。"""
-        return self.hparams.val_ratio
-
-    @property
-    def streaming(self) -> bool:
-        """返回是否使用流式模式。"""
-        return self.hparams.streaming
-
-    @property
-    def seed(self) -> int:
-        """返回随机种子。"""
-        return self.hparams.seed
-
-    @property
-    def stride(self) -> int:
-        """返回滑动窗口步长。"""
-        return self.hparams.stride or self.hparams.seq_len

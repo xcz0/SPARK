@@ -29,8 +29,10 @@ def temp_data_dir():
                 "log_prev_review_duration": rng.standard_normal(n_records),
                 "log_last_duration_on_card": rng.standard_normal(n_records),
                 "card_index_today": rng.integers(0, 10, n_records),
+                "card_review_count": rng.integers(0, 100, n_records),
                 "state": rng.integers(0, 4, n_records),
                 "prev_review_rating": rng.integers(0, 5, n_records),
+                "last_rating_on_card": rng.integers(0, 5, n_records),
                 "is_first_review": rng.choice([True, False], n_records),
                 "day_offset": np.arange(n_records, dtype=float),
                 "card_id": rng.integers(1, 20, n_records),
@@ -59,9 +61,9 @@ class TestReviewDataModule:
             num_workers=0,
         )
 
-        assert dm.seq_len == 32
-        assert dm.batch_size == 4
-        assert dm.stride == 32  # 默认等于 seq_len
+        assert dm.hparams.seq_len == 32
+        assert dm.hparams.batch_size == 4
+        assert dm.hparams.stride == 32  # 默认等于 seq_len
 
     def test_setup_preload_mode(self, temp_data_dir):
         """测试预加载模式设置。"""
@@ -169,7 +171,7 @@ class TestReviewDataModule:
             seq_len=32,
             batch_size=4,
         )
-        assert dm_default.num_numerical_features == 6
+        assert dm_default.num_numerical_features == 7
         assert dm_default.num_categorical_features == 3
         assert "state" in dm_default.categorical_vocab_sizes
 
@@ -281,17 +283,17 @@ features:
 
         # 测试基本创建
         dm = ReviewDataModule.from_config(config_path)
-        assert dm.batch_size == 8
-        assert dm.seq_len == 32
-        assert dm.train_ratio == 0.7
+        assert dm.hparams.batch_size == 8
+        assert dm.hparams.seq_len == 32
+        assert dm.hparams.train_ratio == 0.7
 
         # 测试参数覆盖
         dm_override = ReviewDataModule.from_config(
             config_path,
             overrides={"batch_size": 16, "seq_len": 64},
         )
-        assert dm_override.batch_size == 16
-        assert dm_override.seq_len == 64
+        assert dm_override.hparams.batch_size == 16
+        assert dm_override.hparams.seq_len == 64
 
     def test_training_batch_validity(self, temp_data_dir):
         """测试训练批次的有效性和一致性。"""
