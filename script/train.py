@@ -2,10 +2,10 @@
 
 Usage:
     python script/train.py [--config CONFIG_DIR] [--epochs N] [--batch-size N] [--lr LR]
-                           [--data-dir DIR] [--output-dir DIR] [--wandb] [--resume CKPT]
+                           [--data-dir DIR] [--output-dir DIR] [--resume CKPT]
 
 Example:
-    python script/train.py --epochs 20 --batch-size 64 --wandb
+    python script/train.py --epochs 20 --batch-size 64
 """
 
 import argparse
@@ -21,7 +21,7 @@ from lightning.pytorch.callbacks import (
     ModelCheckpoint,
     RichProgressBar,
 )
-from lightning.pytorch.loggers import WandbLogger
+from lightning.pytorch.loggers import TensorBoardLogger
 
 # 添加项目根目录到路径
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -110,21 +110,6 @@ def parse_args() -> argparse.Namespace:
         help="从检查点恢复训练",
     )
 
-    # 日志和监控
-    parser.add_argument(
-        "--wandb",
-        action="store_true",
-        help="启用 Weights & Biases 日志",
-    )
-
-    # 设备配置
-    parser.add_argument(
-        "--accelerator",
-        type=str,
-        default="auto",
-        choices=["auto", "cpu", "gpu", "mps"],
-        help="训练设备",
-    )
     parser.add_argument(
         "--devices",
         type=int,
@@ -242,20 +227,18 @@ def main() -> None:
 
     # 配置日志器
     loggers = []
-    if args.wandb:
-        wandb_logger = WandbLogger(
-            project="SPARK",
-            save_dir=args.output_dir,
-            log_model=True,
-        )
-        wandb_logger.watch(model, log="gradients", log_freq=100)
-        loggers.append(wandb_logger)
-        logger.info("W&B 日志已启用")
+
+    # 使用 TensorBoard 记录日志
+    tb_logger = TensorBoardLogger(
+        save_dir=args.output_dir,
+        name="lightning_logs",
+    )
+    loggers.append(tb_logger)
+    logger.info("TensorBoard 日志已启用")
 
     # 初始化训练器
     trainer = Trainer(
         max_epochs=max_epochs,
-        accelerator=args.accelerator,
         devices=args.devices,
         precision=str(trainer_config.get("precision", 32)),
         callbacks=callbacks,
