@@ -94,5 +94,5 @@ class FeatureConfig:
 
 
 # 默认配置实例
-DEFAULT_FEATURE_CONFIG = FeatureConfig.from_yaml("config/data.yaml")
+DEFAULT_FEATURE_CONFIG = FeatureConfig.from_yaml("configs/data.yaml")
 DEFAULT_COLLATOR_CONFIG = CollatorConfig()
