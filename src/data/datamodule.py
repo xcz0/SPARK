@@ -236,7 +236,7 @@ class ReviewDataModule(LightningDataModule):
                 )
 
     def _create_dataloader(
-        self, dataset: _DatasetType, *, shuffle: bool = False, drop_last: bool = False
+        self, dataset: _DatasetType, shuffle: bool = False, drop_last: bool = False
     ) -> DataLoader:
         """创建 DataLoader 的通用方法。"""
         return DataLoader(
