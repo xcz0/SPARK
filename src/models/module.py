@@ -265,6 +265,12 @@ class SPARKModule(LightningModule):
         outputs = self(batch)
         self._compute_step(batch, outputs, "test")
 
+    def predict_step(
+        self, batch: dict[str, Tensor], batch_idx: int, dataloader_idx: int = 0
+    ) -> dict[str, Tensor]:
+        """预测步骤。"""
+        return self(batch)
+
     def configure_optimizers(self) -> dict[str, Any]:
         """配置优化器和学习率调度器。"""
         hparams = self.hparams
