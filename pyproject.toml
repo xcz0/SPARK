@@ -12,6 +12,7 @@ dependencies = [
     "wandb",
     "loguru",
     "einops",
+    "rich",
 ]
 
 [dependency-groups]
