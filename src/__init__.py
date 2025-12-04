@@ -1,3 +1,6 @@
 """SPARK package entrypoint"""
 
-__all__ = ["data", "models", "utils"]
+from . import data, models, utils
+from .predict import predict
+
+__all__ = ["data", "models", "utils", "predict"]
