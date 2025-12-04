@@ -138,59 +138,80 @@ class SPARKModel(Module):
     Time-Aware Multi-Head Causal Transformer 用于间隔重复学习预测。
     """
 
-    def __init__(self, config: ModelConfig | None = None, **kwargs):
-        """初始化模型。
+    def __init__(
+        self,
+        config: ModelConfig | None = None,
+        d_model: int | None = None,
+        n_heads: int | None = None,
+        depth: int | None = None,
+        d_ff: int | None = None,
+        dropout: float | None = None,
+        num_numerical_features: int | None = None,
+        categorical_vocab_sizes: dict[str, int] | None = None,
+        categorical_embed_dim: int | None = None,
+        num_rating_classes: int | None = None,
+        card_head_ratio: float | None = None,
+        deck_head_ratio: float | None = None,
+    ):
+        """初始化模型并支持显式字段覆盖。"""
 
-        Args:
-            config: 模型配置
-            **kwargs: 配置参数覆盖
-        """
         super().__init__()
 
-        # 合并配置
-        if config is None:
-            config = ModelConfig(**kwargs)
-        else:
-            for k, v in kwargs.items():
-                if hasattr(config, k):
-                    setattr(config, k, v)
-        self.config = config
+        overrides = {
+            "d_model": d_model,
+            "n_heads": n_heads,
+            "depth": depth,
+            "d_ff": d_ff,
+            "dropout": dropout,
+            "num_numerical_features": num_numerical_features,
+            "categorical_vocab_sizes": categorical_vocab_sizes,
+            "categorical_embed_dim": categorical_embed_dim,
+            "num_rating_classes": num_rating_classes,
+            "card_head_ratio": card_head_ratio,
+            "deck_head_ratio": deck_head_ratio,
+        }
+
+        config_obj = config or ModelConfig()
+        for field_name, value in overrides.items():
+            if value is not None:
+                setattr(config_obj, field_name, value)
+        self.config = config_obj
 
         # 输入层
         self.input_layer = InputLayer(
-            d_model=config.d_model,
-            num_numerical_features=config.num_numerical_features,
-            categorical_vocab_sizes=config.categorical_vocab_sizes,
-            categorical_embed_dim=config.categorical_embed_dim,
-            dropout=config.dropout,
+            d_model=config_obj.d_model,
+            num_numerical_features=config_obj.num_numerical_features,
+            categorical_vocab_sizes=config_obj.categorical_vocab_sizes,
+            categorical_embed_dim=config_obj.categorical_embed_dim,
+            dropout=config_obj.dropout,
         )
 
         # Transformer 层堆叠
         self.transformer_blocks = ModuleList(
             [
                 TransformerBlock(
-                    d_model=config.d_model,
-                    n_heads=config.n_heads,
-                    d_ff=config.d_ff,
-                    dropout=config.dropout,
-                    card_head_ratio=config.card_head_ratio,
-                    deck_head_ratio=config.deck_head_ratio,
+                    d_model=config_obj.d_model,
+                    n_heads=config_obj.n_heads,
+                    d_ff=config_obj.d_ff,
+                    dropout=config_obj.dropout,
+                    card_head_ratio=config_obj.card_head_ratio,
+                    deck_head_ratio=config_obj.deck_head_ratio,
                 )
-                for _ in range(config.depth)
+                for _ in range(config_obj.depth)
             ]
         )
 
         # Pre-LN 结构需要在最后添加 LayerNorm
-        self.final_norm = LayerNorm(config.d_model)
+        self.final_norm = LayerNorm(config_obj.d_model)
 
         # 输出头
         self.rating_head = CORALHead(
-            d_model=config.d_model,
-            num_classes=config.num_rating_classes,
+            d_model=config_obj.d_model,
+            num_classes=config_obj.num_rating_classes,
         )
         self.duration_head = DurationHead(
-            d_model=config.d_model,
-            dropout=config.dropout,
+            d_model=config_obj.d_model,
+            dropout=config_obj.dropout,
         )
 
     def forward(
@@ -242,22 +263,12 @@ class SPARKModel(Module):
             "hidden_states": x,
         }
 
-    def predict_rating(self, **kwargs) -> Tensor:
-        """预测评分。
+    def predict_rating(self, rating_probs: Tensor) -> Tensor:
+        """根据已计算的 rating 概率预测离散评分。"""
 
-        Returns:
-            (batch, seq_len) 预测评分 (1-4)
-        """
-        outputs = self.forward(**kwargs)
-        probs = outputs["rating_probs"]
-        return 1 + (probs > 0.5).sum(dim=-1)
+        return 1 + (rating_probs > 0.5).sum(dim=-1)
 
-    def predict_expected_rating(self, **kwargs) -> Tensor:
-        """使用概率期望预测评分。
+    def predict_expected_rating(self, rating_probs: Tensor) -> Tensor:
+        """根据已计算的 rating 概率计算期望评分。"""
 
-        Returns:
-            (batch, seq_len) 期望评分
-        """
-        outputs = self.forward(**kwargs)
-        probs = outputs["rating_probs"]
-        return 1.0 + probs.sum(dim=-1)
+        return 1.0 + rating_probs.sum(dim=-1)
