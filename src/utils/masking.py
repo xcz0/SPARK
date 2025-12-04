@@ -8,151 +8,104 @@
 """
 
 from functools import reduce
+from typing import Optional
 
 import torch
-from einops import rearrange
 from torch import Tensor
-
 
 # ============================================================================
 # 基础掩码函数
 # ============================================================================
 
 
-def create_padding_mask(seq_lens: Tensor, max_len: int | None) -> Tensor:
-    """创建填充掩码，标记有效位置。
+def create_padding_mask(seq_lens: Tensor, max_len: Optional[int] = None) -> Tensor:
+    """创建填充掩码，标记有效位置 (True为有效)。
 
     Args:
-        seq_lens: (batch,) 每个序列的实际长度
-        max_len: 最大序列长度，默认使用 seq_lens 中的最大值
+        seq_lens: (batch,) 序列长度
+        max_len: 最大长度，若为 None 则自动推导
 
     Returns:
-        (batch, max_len) 布尔张量，True 表示有效位置
+        (batch, max_len) BoolTensor
     """
-    max_len = max_len or int(seq_lens.max().item())
-    positions = torch.arange(max_len, device=seq_lens.device)
-    return rearrange(positions, "seq -> 1 seq") < rearrange(
-        seq_lens, "batch -> batch 1"
-    )
+    if max_len is None:
+        # 使用 max() 会触发同步，但在 CPU Collator 中通常可接受
+        max_len = int(seq_lens.max().item())
+
+    # 利用广播：(1, max_len) < (batch, 1) -> (batch, max_len)
+    positions = torch.arange(max_len, device=seq_lens.device).unsqueeze(0)
+    return positions < seq_lens.unsqueeze(1)
 
 
 def create_causal_mask(seq_len: int, device: torch.device) -> Tensor:
-    """创建因果掩码，防止注意到未来位置。
-
-    Args:
-        seq_len: 序列长度
-        device: 目标设备
+    """创建因果掩码。
 
     Returns:
-        (seq_len, seq_len) 布尔下三角矩阵
+        (seq_len, seq_len) BoolTensor, 下三角为 True
     """
-    return torch.ones(seq_len, seq_len, dtype=torch.bool, device=device).tril()
+    # 使用 tril 直接生成下三角布尔矩阵，避免中间分配
+    return torch.tril(torch.ones(seq_len, seq_len, device=device, dtype=torch.bool))
 
 
-def create_same_element_mask(ids: Tensor, special_id: int | None = None) -> Tensor:
-    """创建同元素掩码，标记 ID 相同的位置对。
-
-    适用于标记同一卡片、同一用户等场景。
+def create_same_element_mask(ids: Tensor, special_id: Optional[int] = None) -> Tensor:
+    """创建同元素掩码。
 
     Args:
-        ids: (batch, seq_len) 元素 ID 张量
-        special_id: 特殊 ID，该 ID 对应的位置掩码标记为 False
+        ids: (batch, seq_len)
+        special_id: 如果提供，该 ID 之间的位置将被视为 False (不关注)
 
     Returns:
-        (batch, seq_len, seq_len) 布尔张量
+        (batch, seq_len, seq_len) BoolTensor
     """
-    same_mask = rearrange(ids, "batch seq_i -> batch 1 seq_i") == rearrange(
-        ids, "batch seq_j -> batch seq_j 1"
-    )
+    # 使用 None 索引进行广播：(batch, seq_len, 1) == (batch, 1, seq_len)
+    same_mask = ids[:, :, None] == ids[:, None, :]
 
     if special_id is None:
         return same_mask
 
-    # 特殊 ID 对应的位置标记为 False
-    special_mask = rearrange(ids != special_id, "batch seq -> batch 1 seq") & rearrange(
-        ids != special_id, "batch seq -> batch seq 1"
-    )
-    return same_mask & special_mask
+    # 只有当两个位置都不是 special_id 时才保留
+    valid_ids = ids != special_id
+    valid_pairs = valid_ids[:, :, None] & valid_ids[:, None, :]
+    return same_mask & valid_pairs
 
 
 def create_different_element_mask(ids: Tensor) -> Tensor:
-    """创建不同元素掩码，标记 ID 不同的位置对。
-
-    Args:
-        ids: (batch, seq_len) 元素 ID 张量
-
-    Returns:
-        (batch, seq_len, seq_len) 布尔张量
-    """
-    return rearrange(ids, "batch seq_i -> batch 1 seq_i") != rearrange(
-        ids, "batch seq_j -> batch seq_j 1"
-    )
+    """创建不同元素掩码。"""
+    return ids[:, :, None] != ids[:, None, :]
 
 
 def combine_masks(*masks: Tensor) -> Tensor:
-    """组合多个布尔掩码（逻辑与）。
-
-    自动处理维度广播。
-
-    Args:
-        *masks: 多个布尔掩码张量
-
-    Returns:
-        组合后的掩码
-    """
-    return reduce(torch.Tensor.__and__, masks)
+    """组合多个掩码（逻辑与）。"""
+    if not masks:
+        raise ValueError("Must provide at least one mask.")
+    return reduce(torch.logical_and, masks)
 
 
 def create_padding_mask_2d(padding_mask: Tensor) -> Tensor:
-    """将 1D 填充掩码转换为 2D 注意力掩码。
-
-    Args:
-        padding_mask: (batch, seq_len) 填充掩码
-
-    Returns:
-        (batch, seq_len, seq_len) 2D 填充掩码
-    """
-    return rearrange(padding_mask, "batch seq_i -> batch 1 seq_i") & rearrange(
-        padding_mask, "batch seq_j -> batch seq_j 1"
-    )
+    """将 1D (batch, seq) 填充掩码转为 2D (batch, seq, seq)。"""
+    # (batch, seq, 1) & (batch, 1, seq)
+    return padding_mask[:, :, None] & padding_mask[:, None, :]
 
 
 def apply_padding_to_attention_mask(
     attention_mask: Tensor, padding_mask: Tensor
 ) -> Tensor:
-    """将填充掩码应用到注意力掩码上。
-
-    Args:
-        attention_mask: (batch, seq_len, seq_len) 或 (seq_len, seq_len) 注意力掩码
-        padding_mask: (batch, seq_len) 填充掩码
-
-    Returns:
-        (batch, seq_len, seq_len) 应用填充后的掩码
-    """
+    """将填充掩码应用到注意力掩码。"""
     padding_2d = create_padding_mask_2d(padding_mask)
 
-    if attention_mask.dim() == 2:
-        attention_mask = rearrange(attention_mask, "query key -> 1 query key")
-
+    # 如果 attention_mask 是 (L, L)，它会自动广播到 (B, L, L)
     return attention_mask & padding_2d
 
 
 # ============================================================================
-# 复合掩码函数（用于多头注意力机制）
+# 复合掩码函数
 # ============================================================================
 
 
 def create_card_mask(card_ids: Tensor) -> Tensor:
-    """创建卡片掩码，用于卡片记忆回溯头。
-
-    仅允许关注同一张卡片的历史记录。
-
-    Args:
-        card_ids: (batch, seq_len) 卡片 ID 张量
-
-    Returns:
-        (batch, seq_len, seq_len) 布尔掩码
-    """
+    """创建卡片掩码 (Same Card & Causal)。"""
+    # 这里的 combine 能够处理不同维度的广播
+    # (B, L, L) & (L, L) -> (B, L, L)
     return combine_masks(
         create_same_element_mask(card_ids),
         create_causal_mask(card_ids.size(1), device=card_ids.device),
@@ -160,34 +113,15 @@ def create_card_mask(card_ids: Tensor) -> Tensor:
 
 
 def create_deck_mask(deck_ids: Tensor, card_ids: Tensor) -> Tensor:
-    """创建卡组掩码，用于知识关联头。
-
-    允许关注同一卡组的其他卡片（排除同一张卡片）。
-
-    Args:
-        deck_ids: (batch, seq_len) 卡组 ID 张量
-        card_ids: (batch, seq_len) 卡片 ID 张量
-
-    Returns:
-        (batch, seq_len, seq_len) 布尔掩码
-    """
+    """创建卡组掩码 (Same Deck & Different Card & Causal)。"""
     return combine_masks(
-        create_same_element_mask(deck_ids),
+        create_same_element_mask(ids=deck_ids, special_id=0),  #  0 是特殊卡组 ID
         create_different_element_mask(card_ids),
         create_causal_mask(deck_ids.size(1), device=deck_ids.device),
     )
 
 
 def create_time_diff_matrix(time_stamps: Tensor) -> Tensor:
-    """创建时间差矩阵，用于计算时间衰减偏置。
-
-    Args:
-        time_stamps: (batch, seq_len) 时间戳张量
-
-    Returns:
-        (batch, seq_len, seq_len) 时间差绝对值矩阵
-    """
-    return torch.abs(
-        rearrange(time_stamps, "batch query -> batch query 1")
-        - rearrange(time_stamps, "batch key -> batch 1 key")
-    )
+    """创建时间差矩阵 (绝对值)。"""
+    # (batch, seq, 1) - (batch, 1, seq) -> (batch, seq, seq)
+    return (time_stamps[:, :, None] - time_stamps[:, None, :]).abs()
