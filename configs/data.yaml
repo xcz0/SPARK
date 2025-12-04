@@ -14,8 +14,8 @@ data:
   stride: null               # 滑动窗口步长，null 表示等于 window_size（无重叠）
 
   # 数据集划分
-  train_ratio: 0.8           # 训练集比例
-  val_ratio: 0.1             # 验证集比例（测试集 = 1 - train - val）
+  train_ratio: 0.9           # 训练集比例
+  val_ratio: 0.1             # 验证集比例，不设置测试集
 
   # 加载模式
   streaming: false           # 是否使用流式加载模式（大数据集时启用）
