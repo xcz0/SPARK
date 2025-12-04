@@ -27,8 +27,8 @@ from lightning.pytorch.loggers import TensorBoardLogger
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.data.datamodule import ReviewDataModule
-from src.models.module import SPARKModule
+from spark.data.datamodule import ReviewDataModule
+from spark.models.module import SPARKModule
 
 
 def load_config(config_dir: Path) -> dict:

@@ -7,7 +7,7 @@ from unittest import mock
 import pytest
 import torch
 
-from src.models.module import SPARKModule
+from spark.models.module import SPARKModule
 
 
 @pytest.fixture

@@ -3,7 +3,7 @@
 import pytest
 import torch
 
-from src.utils.masking import (
+from spark.utils.masking import (
     apply_padding_to_attention_mask,
     combine_masks,
     create_card_mask,

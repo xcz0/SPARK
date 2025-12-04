@@ -19,7 +19,7 @@ from .config import (
 from .datamodule import ReviewDataModule
 from .dataset import ReviewSequenceDataset, StreamingReviewDataset
 from .loader import load_all_users_data, load_user_data
-from src.utils.masking import (
+from ..utils.masking import (
     create_card_mask,
     create_causal_mask,
     create_deck_mask,

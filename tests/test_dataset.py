@@ -17,8 +17,8 @@ if str(PROJECT_ROOT) not in sys.path:
 
 os.chdir(PROJECT_ROOT)
 
-from src.data.config import FeatureConfig
-from src.data.dataset import ReviewSequenceDataset, StreamingReviewDataset
+from spark.data.config import FeatureConfig
+from spark.data.dataset import ReviewSequenceDataset, StreamingReviewDataset
 
 
 @pytest.fixture
@@ -353,7 +353,7 @@ class TestRealConfigAndData:
         self, real_config: FeatureConfig, real_data_path: Path
     ):
         """测试加载真实用户数据。"""
-        from src.data.loader import load_user_data
+        from spark.data.loader import load_user_data
 
         data_file = real_data_path / "user_id=1.parquet"
         if not data_file.exists():
@@ -375,7 +375,7 @@ class TestRealConfigAndData:
         self, real_config: FeatureConfig, real_data_path: Path
     ):
         """使用真实配置和数据测试 ReviewSequenceDataset。"""
-        from src.data.loader import load_user_data
+        from spark.data.loader import load_user_data
 
         data_file = real_data_path / "user_id=1.parquet"
         if not data_file.exists():

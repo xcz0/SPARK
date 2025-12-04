@@ -3,8 +3,8 @@
 import pytest
 import torch
 
-from src.data.collator import ReviewCollator
-from src.data.config import CollatorConfig
+from spark.data.collator import ReviewCollator
+from spark.data.config import CollatorConfig
 
 
 class TestCollatorConfig:

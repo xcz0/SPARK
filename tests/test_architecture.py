@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import torch
 
-from src.models.architecture import ModelConfig, SPARKModel
+from spark.models.architecture import ModelConfig, SPARKModel
 
 _MODEL_INPUT_KEYS = (
     "numerical_features",

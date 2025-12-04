@@ -6,10 +6,10 @@ import numpy as np
 import pytest
 import torch
 
-from src.data.config import FeatureConfig
-from src.data.dataset import ReviewSequenceDataset
-from src.models.architecture import ModelConfig, SPARKModel
-from src.predict import predict
+from spark.data.config import FeatureConfig
+from spark.data.dataset import ReviewSequenceDataset
+from spark.models.architecture import ModelConfig, SPARKModel
+from spark.predict import predict
 
 TEST_FEATURE_CONFIG = FeatureConfig(
     numerical_features=(

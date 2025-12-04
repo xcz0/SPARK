@@ -4,7 +4,7 @@ import pytest
 import torch
 from torchmetrics import MeanSquaredError
 
-from src.utils.metrics import OrdinalAccuracy, ordinal_accuracy, rmse
+from spark.utils.metrics import OrdinalAccuracy, ordinal_accuracy, rmse
 
 
 class TestOrdinalAccuracy:

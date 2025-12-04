@@ -3,7 +3,7 @@
 import pytest
 import torch
 
-from src.models.losses import (
+from spark.models.losses import (
     CORALLoss,
     CombinedLoss,
     DurationLoss,

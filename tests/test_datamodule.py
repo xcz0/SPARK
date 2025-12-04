@@ -6,8 +6,8 @@ import pytest
 import tempfile
 from pathlib import Path
 
-from src.data.datamodule import ReviewDataModule
-from src.data.config import FeatureConfig
+from spark.data.datamodule import ReviewDataModule
+from spark.data.config import FeatureConfig
 
 
 @pytest.fixture(scope="module")

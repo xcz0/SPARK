@@ -4,17 +4,17 @@ from __future__ import annotations
 
 import torch
 
-from src.models.components.attention import (
+from spark.models.components.attention import (
     DifferentialMultiHeadAttention,
     TimeDecayBias,
 )
-from src.models.components.embeddings import (
+from spark.models.components.embeddings import (
     CategoricalEmbedding,
     NumericalProjection,
     Time2Vec,
 )
-from src.models.components.heads import CORALHead, DurationHead
-from src.models.components.input_layer import InputLayer
+from spark.models.components.heads import CORALHead, DurationHead
+from spark.models.components.input_layer import InputLayer
 
 
 class DummyMHA(torch.nn.Module):
