@@ -13,6 +13,7 @@ dependencies = [
     "loguru",
     "einops",
     "rich",
+    "tensorboard",
 ]
 
 [dependency-groups]
