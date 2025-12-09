@@ -94,3 +94,62 @@ def test_predict_helpers_match_manual_decoding(
 
     assert torch.equal(rating_preds, manual_ratings)
     assert torch.allclose(expected_preds, manual_expectation, atol=1e-5)
+
+
+class TestFeatureNames:
+    """Tests for feature name properties."""
+
+    def test_numerical_feature_names_default_is_none(self):
+        """numerical_feature_names should be None when not specified."""
+        model = SPARKModel()
+        assert model.numerical_feature_names is None
+
+    def test_numerical_feature_names_from_config(self):
+        """numerical_feature_names should return value from config."""
+        feature_names = ("delta_t", "r_history_cnt", "n_learning_cnt")
+        config = ModelConfig(numerical_feature_names=feature_names)
+        model = SPARKModel(config=config)
+
+        assert model.numerical_feature_names == feature_names
+
+    def test_numerical_feature_names_from_kwargs(self):
+        """numerical_feature_names should be settable via kwargs."""
+        feature_names = ("feature_a", "feature_b")
+        model = SPARKModel(numerical_feature_names=feature_names)
+
+        assert model.numerical_feature_names == feature_names
+
+    def test_categorical_feature_names_from_vocab_keys(self):
+        """categorical_feature_names should return vocab dict keys."""
+        vocab = {"state": 4, "difficulty": 5, "is_new": 2}
+        model = SPARKModel(categorical_vocab_sizes=vocab)
+
+        assert model.categorical_feature_names == tuple(vocab.keys())
+
+    def test_time_feature_name_default(self):
+        """time_feature_name should default to 'day_offset'."""
+        model = SPARKModel()
+        assert model.time_feature_name == "day_offset"
+
+    def test_time_feature_name_custom(self):
+        """time_feature_name should be customizable."""
+        model = SPARKModel(time_feature_name="timestamp")
+        assert model.time_feature_name == "timestamp"
+
+    def test_all_feature_names_structure(self):
+        """all_feature_names should return dict with all feature categories."""
+        numerical = ("feat1", "feat2")
+        vocab = {"cat1": 3, "cat2": 5}
+        time_name = "my_time"
+
+        model = SPARKModel(
+            numerical_feature_names=numerical,
+            categorical_vocab_sizes=vocab,
+            time_feature_name=time_name,
+        )
+
+        result = model.all_feature_names
+
+        assert result["numerical"] == numerical
+        assert result["categorical"] == tuple(vocab.keys())
+        assert result["time"] == time_name

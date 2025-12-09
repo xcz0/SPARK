@@ -31,6 +31,8 @@ class ModelConfig:
     num_rating_classes: int = 4
     card_head_ratio: float = 0.5
     deck_head_ratio: float = 0.25
+    numerical_feature_names: tuple[str, ...] | None = None
+    time_feature_name: str = "day_offset"
 
     def __post_init__(self):
         if self.categorical_vocab_sizes is None:
@@ -152,6 +154,8 @@ class SPARKModel(Module):
         num_rating_classes: int | None = None,
         card_head_ratio: float | None = None,
         deck_head_ratio: float | None = None,
+        numerical_feature_names: tuple[str, ...] | None = None,
+        time_feature_name: str | None = None,
     ):
         """初始化模型并支持显式字段覆盖。"""
 
@@ -169,6 +173,8 @@ class SPARKModel(Module):
             "num_rating_classes": num_rating_classes,
             "card_head_ratio": card_head_ratio,
             "deck_head_ratio": deck_head_ratio,
+            "numerical_feature_names": numerical_feature_names,
+            "time_feature_name": time_feature_name,
         }
 
         config_obj = config or ModelConfig()
@@ -277,3 +283,38 @@ class SPARKModel(Module):
         """根据已计算的 rating 概率预测回忆正确（评分大于1）的概率。"""
 
         return rating_probs[..., 0]
+
+    @property
+    def numerical_feature_names(self) -> tuple[str, ...] | None:
+        """返回数值特征名称列表。
+
+        Returns:
+            如果配置中指定了特征名称则返回，否则返回 None。
+        """
+        return self.config.numerical_feature_names
+
+    @property
+    def categorical_feature_names(self) -> tuple[str, ...]:
+        """返回类别特征名称列表（基于配置的词表键）。"""
+        return tuple(self.config.categorical_vocab_sizes.keys())
+
+    @property
+    def time_feature_name(self) -> str:
+        """返回时间特征名称。"""
+        return self.config.time_feature_name
+
+    @property
+    def all_feature_names(self) -> dict[str, tuple[str, ...] | str | None]:
+        """返回所有输入特征的名称。
+
+        Returns:
+            包含以下键的字典:
+            - numerical: 数值特征名称元组（可能为 None）
+            - categorical: 类别特征名称元组
+            - time: 时间特征名称
+        """
+        return {
+            "numerical": self.numerical_feature_names,
+            "categorical": self.categorical_feature_names,
+            "time": self.time_feature_name,
+        }
