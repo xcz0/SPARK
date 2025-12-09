@@ -172,13 +172,27 @@ def process_single_user(user_id: int, summaries_dir: Path) -> ProcessResult:
             output_file, index=False, engine="pyarrow", compression="snappy"
         )
 
+        # Helper to get stats
+        def get_stats(series):
+            clean = series.replace([np.inf, -np.inf], np.nan).dropna()
+            if len(clean) == 0:
+                return 0, 0.0, 0.0
+            return len(clean), clean.mean(), clean.std()
+
+        n_dur, m_dur, s_dur = get_stats(summary_df["log_duration"])
+        n_ela, m_ela, s_ela = get_stats(summary_df["log_elapsed_seconds"])
+
         # 计算用户统计信息
         user_stats = {
             "user_id": user_id,
             "user_mean_rating": summary_df["rating"].mean(),
             "user_std_rating": summary_df["rating"].std(),
-            "user_mean_log_duration": summary_df["log_duration"].mean(),
-            "user_std_log_duration": summary_df["log_duration"].std(),
+            "user_mean_log_duration": m_dur,
+            "user_std_log_duration": s_dur,
+            "user_count_log_duration": n_dur,
+            "user_mean_log_elapsed": m_ela,
+            "user_std_log_elapsed": s_ela,
+            "user_count_log_elapsed": n_ela,
             "total_reviews": log_nums,
         }
 
@@ -189,69 +203,68 @@ def process_single_user(user_id: int, summaries_dir: Path) -> ProcessResult:
         return ProcessResult(2, str(e), 0, user_id, {})
 
 
-def compute_global_stats(summaries_dir: Path, user_range: range) -> dict | None:
+def compute_global_stats(summaries_dir: Path) -> dict | None:
     """
-    计算全局统计量（使用增量方式避免内存溢出）
+    计算全局统计量（从 user_stats.csv 读取）
 
     Parameters:
     summaries_dir (Path): 数据目录
-    user_range (range): 用户ID范围
 
     Returns:
     dict | None: 全局统计量字典，失败返回None
     """
-    # 使用 Welford 算法进行在线计算均值和方差
-    n_elapsed, mean_elapsed, m2_elapsed = 0, 0.0, 0.0
-    n_duration, mean_duration, m2_duration = 0, 0.0, 0.0
-
-    for user_id in tqdm(user_range, desc="计算全局统计量"):
-        user_file = summaries_dir / f"user_id={user_id}.parquet"
-        if not user_file.exists():
-            continue
-
-        try:
-            user_df = pd.read_parquet(
-                user_file, columns=["log_elapsed_seconds", "log_duration"]
-            )
-
-            # 处理 log_elapsed_seconds
-            valid_elapsed = (
-                user_df["log_elapsed_seconds"]
-                .replace([np.inf, -np.inf], np.nan)
-                .dropna()
-                .values
-            )
-            for x in valid_elapsed:
-                n_elapsed += 1
-                delta = x - mean_elapsed
-                mean_elapsed += delta / n_elapsed
-                m2_elapsed += delta * (x - mean_elapsed)
-
-            # 处理 log_duration
-            valid_duration = (
-                user_df["log_duration"]
-                .replace([np.inf, -np.inf], np.nan)
-                .dropna()
-                .values
-            )
-            for x in valid_duration:
-                n_duration += 1
-                delta = x - mean_duration
-                mean_duration += delta / n_duration
-                m2_duration += delta * (x - mean_duration)
-
-        except Exception as e:
-            logging.error(f"读取用户 {user_id} 数据计算全局统计时出错: {e}")
-
-    if n_elapsed < 2 or n_duration < 2:
+    stats_file = summaries_dir / "user_stats.csv"
+    if not stats_file.exists():
+        print(f"未找到 {stats_file}，无法计算全局统计量")
         return None
 
-    return {
-        "mean_log_elapsed": mean_elapsed,
-        "std_log_elapsed": np.sqrt(m2_elapsed / (n_elapsed - 1)),
-        "mean_log_duration": mean_duration,
-        "std_log_duration": np.sqrt(m2_duration / (n_duration - 1)),
-    }
+    try:
+        df = pd.read_csv(stats_file)
+
+        def aggregate_stats(count_col, mean_col, std_col):
+            # Filter out users with 0 counts
+            valid = df[df[count_col] > 0].copy()
+            if valid.empty:
+                return 0.0, 0.0
+
+            counts = valid[count_col]
+            means = valid[mean_col]
+            stds = valid[std_col].fillna(0)
+
+            total_count = counts.sum()
+            if total_count < 2:
+                return means.iloc[0] if total_count == 1 else 0.0, 0.0
+
+            # Global Mean
+            global_mean = (counts * means).sum() / total_count
+
+            # Global Variance
+            # SS_total = sum(SS_within) + SS_between
+            # SS_within = sum((n-1) * s^2)
+            # SS_between = sum(n * (mean - global_mean)^2)
+
+            ss_within = ((counts - 1) * stds**2).sum()
+            ss_between = (counts * (means - global_mean) ** 2).sum()
+
+            global_var = (ss_within + ss_between) / (total_count - 1)
+            return global_mean, np.sqrt(global_var)
+
+        mean_dur, std_dur = aggregate_stats(
+            "user_count_log_duration", "user_mean_log_duration", "user_std_log_duration"
+        )
+        mean_ela, std_ela = aggregate_stats(
+            "user_count_log_elapsed", "user_mean_log_elapsed", "user_std_log_elapsed"
+        )
+
+        return {
+            "mean_log_elapsed": mean_ela,
+            "std_log_elapsed": std_ela,
+            "mean_log_duration": mean_dur,
+            "std_log_duration": std_dur,
+        }
+    except Exception as e:
+        logging.error(f"计算全局统计量时出错: {e}")
+        return None
 
 
 if __name__ == "__main__":
@@ -285,8 +298,8 @@ if __name__ == "__main__":
         print(f"已生成 user_stats.csv，包含 {len(user_stats_data)} 个用户的偏好统计")
 
     # 生成 meta.csv（使用增量算法计算全局统计量）
-    print("\n计算全局统计量（使用前8000个用户数据）...")
-    meta_dict = compute_global_stats(summaries_dir, range(1, 8001))
+    print("\n计算全局统计量（使用 user_stats.csv）...")
+    meta_dict = compute_global_stats(summaries_dir)
     if meta_dict:
         pd.DataFrame([meta_dict]).to_csv(summaries_dir / "meta.csv", index=False)
         print("已生成 meta.csv，包含全局统计量:")
