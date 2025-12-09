@@ -12,7 +12,6 @@
 
 from .collator import ReviewCollator
 from .config import (
-    DEFAULT_FEATURE_CONFIG,
     CollatorConfig,
     FeatureConfig,
 )
@@ -30,7 +29,6 @@ from ..utils.masking import (
 __all__ = [
     # 配置
     "FeatureConfig",
-    "DEFAULT_FEATURE_CONFIG",
     "CollatorConfig",
     # 数据集
     "ReviewSequenceDataset",

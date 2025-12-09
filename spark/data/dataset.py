@@ -13,7 +13,7 @@ import torch
 from torch import Tensor
 from torch.utils.data import Dataset, IterableDataset, get_worker_info
 
-from .config import DEFAULT_FEATURE_CONFIG, FeatureConfig
+from .config import FeatureConfig
 from .loader import load_user_data
 
 
@@ -26,7 +26,7 @@ class ReviewSequenceDataset(Dataset):
     def __init__(
         self,
         data: dict[str, np.ndarray],
-        feature_config: FeatureConfig = DEFAULT_FEATURE_CONFIG,
+        feature_config: FeatureConfig,
         seq_len: int = 256,
         stride: int | None = None,
     ):
@@ -110,7 +110,7 @@ class StreamingReviewDataset(IterableDataset):
         self,
         data_dir: Path | str,
         user_ids: list[int],
-        feature_config: FeatureConfig = DEFAULT_FEATURE_CONFIG,
+        feature_config: FeatureConfig,
         seq_len: int = 256,
         stride: int | None = None,
         shuffle: bool = True,

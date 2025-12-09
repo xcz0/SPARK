@@ -8,7 +8,7 @@ from torch.utils.data import DataLoader, Subset, random_split
 from lightning import LightningDataModule
 
 from .collator import ReviewCollator
-from .config import CollatorConfig, DEFAULT_FEATURE_CONFIG, FeatureConfig
+from .config import CollatorConfig, FeatureConfig
 from .dataset import ReviewSequenceDataset, StreamingReviewDataset
 from .loader import load_all_users_data
 
@@ -75,7 +75,7 @@ class ReviewDataModule(LightningDataModule):
             self.hparams.stride = self.hparams.seq_len
 
         self.data_dir = Path(data_dir)
-        self.feature_config = feature_config or DEFAULT_FEATURE_CONFIG
+        self.feature_config = feature_config
         self._collator = ReviewCollator(collator_config or CollatorConfig())
 
         # 数据集在 setup() 中按需初始化

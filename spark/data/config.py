@@ -91,8 +91,3 @@ class FeatureConfig:
     def all_columns(self) -> tuple[str, ...]:
         """返回所有需要的列名（包含 user_id）。"""
         return (*self.all_input_features, *self.all_target_features, "user_id")
-
-
-# 默认配置实例
-DEFAULT_FEATURE_CONFIG = FeatureConfig.from_yaml("configs/data.yaml")
-DEFAULT_COLLATOR_CONFIG = CollatorConfig()
