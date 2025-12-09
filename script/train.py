@@ -168,6 +168,14 @@ def main(cfg: DictConfig) -> None:
         version=exp_version,
     )
 
+    # 检查断点续训 (检查点保存在 logger 的目录下)
+    ckpt_dir = default_root_dir / exp_name / exp_version / "checkpoints"
+    last_ckpt_path = ckpt_dir / "last.ckpt"
+    ckpt_arg = str(last_ckpt_path) if last_ckpt_path.exists() else None
+
+    if ckpt_arg:
+        logger.info(f"检测到上次训练断点，将从 {last_ckpt_path} 恢复训练")
+
     # 创建回调
     callbacks = create_callbacks(cfg)
 
@@ -183,14 +191,8 @@ def main(cfg: DictConfig) -> None:
         val_check_interval=trainer_cfg.val_check_interval,
         log_every_n_steps=trainer_cfg.log_every_n_steps,
         deterministic=True,
+        enable_model_summary=False,  # 已使用 RichModelSummary，禁用默认摘要
     )
-
-    # 检查断点续训
-    last_ckpt_path = default_root_dir / "checkpoints" / "last.ckpt"
-    ckpt_arg = "last" if last_ckpt_path.exists() else None
-
-    if ckpt_arg:
-        logger.info(f"检测到上次训练断点，将从 {ckpt_arg} 恢复训练")
 
     # 开始训练
     logger.info("开始训练...")
