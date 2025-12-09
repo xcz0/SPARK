@@ -173,7 +173,10 @@ def main(cfg: DictConfig) -> None:
         version=exp_version,
     )
 
-    ckpt_path = find_checkpoint(default_root_dir, exp_name, exp_version)
+    # 优先检查 断点续训
+    ckpt_path = None
+    if cfg.trainer.get("resume", True):
+        ckpt_path = find_checkpoint(default_root_dir, exp_name, exp_version)
 
     trainer = Trainer(
         default_root_dir=default_root_dir,

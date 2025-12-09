@@ -30,3 +30,5 @@ checkpoint:
   save_top_k: 1            # 只保存 1 个检查点
   monitor: val/loss        # 监控指标
   mode: min                # 监控模式
+
+resume: false  # 设为 false 强制重新训练

@@ -25,3 +25,5 @@ checkpoint:
   save_top_k: 3            # 保存最优的 k 个检查点
   monitor: val/loss        # 监控指标
   mode: min                # 监控模式 (min, max)
+
+resume: true  # 设为 false 强制重新训练
