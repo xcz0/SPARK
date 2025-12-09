@@ -1,0 +1,9 @@
+# 模型配置: width128_depth4
+# 基于默认配置的变体
+defaults:
+  - default
+
+# 覆盖参数
+d_model: 128
+depth: 4
+n_heads: 8

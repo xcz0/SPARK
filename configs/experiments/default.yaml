@@ -1,0 +1,13 @@
+# 默认实验配置
+# @package _global_
+
+defaults:
+  - /model: default
+  - /optimizer: adamw
+  - /data: default
+  - /trainer: default
+
+# 实验元信息
+experiment:
+  name: default
+  seed: 42

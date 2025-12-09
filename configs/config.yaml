@@ -1,0 +1,22 @@
+# Hydra 主配置文件
+defaults:
+  - model: default
+  - optimizer: adamw
+  - data: default
+  - trainer: default
+  - _self_
+
+# Hydra 配置
+hydra:
+  run:
+    dir: outputs/${now:%Y-%m-%d}/${now:%H-%M-%S}
+  sweep:
+    dir: outputs/multirun/${now:%Y-%m-%d}/${now:%H-%M-%S}
+    subdir: ${hydra.job.num}
+  job:
+    chdir: false
+
+# 实验元信息
+experiment:
+  name: spark
+  seed: 42

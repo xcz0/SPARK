@@ -1,0 +1,22 @@
+# 测试实验配置 - 快速验证
+# @package _global_
+
+defaults:
+  - /model: default
+  - /optimizer: adamw
+  - /data: default
+  - /trainer: default
+
+# 覆盖参数以加快测试
+trainer:
+  max_epochs: 2
+  log_every_n_steps: 1
+
+data:
+  batch_size: 4
+  window_size: 20
+
+# 实验元信息
+experiment:
+  name: test
+  seed: 42

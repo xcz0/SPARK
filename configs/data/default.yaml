@@ -1,32 +1,30 @@
-# Data configuration
-data:
-  # 数据路径
-  raw_dir: "/home/xcz/Space-Repetition/data/raw"
-  processed_dir: "/home/xcz/Space-Repetition/data/processed"
-  
-  # DataLoader 参数
-  batch_size: 8              # 批次大小
-  num_workers: 2             # DataLoader 工作进程数
-  pin_memory: false          # 是否固定内存（GPU 训练时建议开启）
+# 默认数据配置
+# 数据路径
+raw_dir: "/home/xcz/Space-Repetition/data/raw"
+processed_dir: "/home/xcz/Space-Repetition/data/processed"
 
-  # 序列配置
-  window_size: 50            # 序列窗口长度
-  stride: null               # 滑动窗口步长，null 表示等于 window_size（无重叠）
+# DataLoader 参数
+batch_size: 8              # 批次大小
+num_workers: 2             # DataLoader 工作进程数
+pin_memory: false          # 是否固定内存（GPU 训练时建议开启）
 
-  # 数据集划分
-  train_ratio: 0.9           # 训练集比例
-  val_ratio: 0.1             # 验证集比例，不设置测试集
+# 序列配置
+window_size: 50            # 序列窗口长度
+stride: null               # 滑动窗口步长，null 表示等于 window_size（无重叠）
 
-  # 加载模式
-  streaming: false           # 是否使用流式加载模式（大数据集时启用）
-  
-  # 随机种子
-  seed: 42
+# 数据集划分
+train_ratio: 0.9           # 训练集比例
+val_ratio: 0.1             # 验证集比例，不设置测试集
+
+# 加载模式
+streaming: false           # 是否使用流式加载模式（大数据集时启用）
+
+# 随机种子
+seed: 42
 
 # Feature configuration
 features:
   # 数值特征流 (Numerical Stream)
-  # 用于捕获间隔时间、学习强度、历史耗时等连续信息
   numerical_features:
     - log_elapsed_seconds    # 距上次复习的秒数（log）
     - log_elapsed_days       # 距上次复习的天数（log）
@@ -37,7 +35,6 @@ features:
     - card_review_count      # 该卡片总复习次数
 
   # 类别特征流 (Categorical Stream)
-  # 用于捕获离散状态信息
   categorical_features:
     - state                  # 卡片状态 (0=new, 1=learning, 2=review, 3=relearning)
     - prev_review_rating     # 上次复习评分 (0=无, 1-4=评分)

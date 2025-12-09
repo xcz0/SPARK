@@ -1,0 +1,6 @@
+# AdamW 优化器配置
+_target_: torch.optim.AdamW
+
+learning_rate: 1e-4        # 初始学习率
+weight_decay: 0.01         # 权重衰减
+warmup_steps: 1000         # 预热步数

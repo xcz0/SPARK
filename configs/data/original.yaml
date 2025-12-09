@@ -1,0 +1,17 @@
+# 原始数据配置（无 log 变换）
+defaults:
+  - default
+
+# 覆盖数值特征为原始特征
+features:
+  numerical_features:
+    - elapsed_seconds        # 距上次复习的秒数
+    - elapsed_days           # 距上次复习的天数
+    - time_spent_today       # 今日累计学习时间
+    - prev_review_duration   # 上次复习耗时
+    - last_duration_on_card  # 该卡片上次耗时
+    - card_index_today       # 今日该卡片的第几次复习
+    - card_review_count      # 该卡片总复习次数
+
+  # 目标特征
+  duration_target: duration  # 耗时回归目标（原始值）

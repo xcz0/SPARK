@@ -1,0 +1,16 @@
+# Log 变换数据配置
+defaults:
+  - default
+
+# 使用 log 变换的数值特征（与 default 相同）
+features:
+  numerical_features:
+    - log_elapsed_seconds    # 距上次复习的秒数（log）
+    - log_elapsed_days       # 距上次复习的天数（log）
+    - log_time_spent_today   # 今日累计学习时间（log）
+    - log_prev_review_duration # 上次复习耗时（log）
+    - log_last_duration_on_card # 该卡片上次耗时（log）
+    - card_index_today       # 今日该卡片的第几次复习
+    - card_review_count      # 该卡片总复习次数
+
+  duration_target: log_duration  # 耗时回归目标（log 变换）
