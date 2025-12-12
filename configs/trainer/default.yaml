@@ -3,7 +3,7 @@ default_root_dir: ${oc.env:OUTPUT_ROOT}/pred  # 默认输出目录
 
 # 训练控制
 max_epochs: 200            # 最大训练轮数
-precision: 32              # 训练精度 (16, 32, bf16)
+precision: bf16            # 训练精度 (16, 32, bf16)
 
 # 梯度控制
 gradient_clip_val: 1.0     # 梯度裁剪值
@@ -19,6 +19,11 @@ log_every_n_steps: 10      # 日志记录间隔
 # 设备配置
 accelerator: auto          # 训练设备 (auto, cpu, gpu, mps)
 devices: 1                 # 设备数量
+
+# 性能/可复现性
+deterministic: false       # true 更可复现但更慢
+benchmark: true            # 与 deterministic=false 搭配以提升吞吐
+strategy: auto             # 多卡时可覆盖为 ddp
 
 # 检查点配置
 checkpoint:

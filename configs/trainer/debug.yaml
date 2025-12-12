@@ -20,10 +20,13 @@ log_every_n_steps: 1       # 每步记录日志
 accelerator: auto          # 训练设备
 devices: 1                 # 设备数量
 
+# 性能/可复现性
+deterministic: true
+benchmark: false
+strategy: auto
+
 # 快速调试选项
 fast_dev_run: false        # 设为 true 可只运行 1 个 batch
-limit_train_batches: 5     # 限制训练 batch 数量
-limit_val_batches: 2       # 限制验证 batch 数量
 
 # 检查点配置 - 调试时可简化
 checkpoint:

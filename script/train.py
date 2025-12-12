@@ -75,12 +75,19 @@ def create_model(cfg: DictConfig, data_module: ReviewDataModule) -> SPARKModule:
         d_model=model_cfg.d_model,
         n_heads=model_cfg.n_heads,
         depth=model_cfg.depth,
+        d_ff=model_cfg.get("d_ff"),
         dropout=model_cfg.dropout,
         learning_rate=cfg.optimizer.learning_rate,
+        weight_decay=cfg.optimizer.get("weight_decay", 0.0),
+        warmup_steps=cfg.optimizer.get("warmup_steps", 1000),
         num_numerical_features=data_module.num_numerical_features,
         categorical_vocab_sizes=data_module.categorical_vocab_sizes,
+        categorical_embed_dim=model_cfg.get("categorical_embed_dim", 16),
+        num_rating_classes=model_cfg.get("num_rating_classes", 4),
         card_head_ratio=model_cfg.head_ratios.card,
         deck_head_ratio=model_cfg.head_ratios.deck,
+        rating_loss_weight=model_cfg.loss.get("rating_weight", 1.0),
+        duration_loss_weight=model_cfg.loss.get("duration_weight", 0.1),
     )
 
 
@@ -89,7 +96,7 @@ def create_callbacks(cfg: DictConfig) -> list:
     trainer_cfg = cfg.trainer
     checkpoint_cfg = trainer_cfg.checkpoint
 
-    return [
+    callbacks: list = [
         ModelCheckpoint(
             filename="spark-{epoch:02d}-{val/loss:.4f}",
             monitor=checkpoint_cfg.monitor,
@@ -97,15 +104,23 @@ def create_callbacks(cfg: DictConfig) -> list:
             save_top_k=checkpoint_cfg.save_top_k,
             save_last=True,
         ),
-        EarlyStopping(
-            monitor=checkpoint_cfg.monitor,
-            patience=trainer_cfg.patience,
-            mode=checkpoint_cfg.mode,
-        ),
         LearningRateMonitor(logging_interval="step"),
         RichProgressBar(),
         RichModelSummary(max_depth=2),
     ]
+
+    # patience=null 时不启用 EarlyStopping（便于 debug 配置）
+    if trainer_cfg.get("patience") is not None:
+        callbacks.insert(
+            1,
+            EarlyStopping(
+                monitor=checkpoint_cfg.monitor,
+                patience=int(trainer_cfg.patience),
+                mode=checkpoint_cfg.mode,
+            ),
+        )
+
+    return callbacks
 
 
 _PrecisionLiteral = Literal[
@@ -184,17 +199,43 @@ def main(cfg: DictConfig) -> None:
     if cfg.trainer.get("resume", True):
         ckpt_path = find_checkpoint(default_root_dir, exp_name, exp_version)
 
+    # 处理精度：当未使用 CUDA/MPS 时，强制回退到 32，避免 16/bf16 在 CPU 上报错
+    requested_precision = trainer_cfg.precision
+    resolved_precision = requested_precision
+    if not torch.cuda.is_available():
+        if requested_precision in (16, "bf16", "16", "16-mixed", "bf16-mixed"):
+            logger.warning(
+                "当前未检测到 CUDA，precision=%s 将回退为 32",
+                requested_precision,
+            )
+            resolved_precision = 32
+    else:
+        if (
+            requested_precision in ("bf16", "bf16-mixed")
+            and not torch.cuda.is_bf16_supported()
+        ):
+            logger.warning("当前 CUDA 不支持 bf16，precision 将回退为 16-mixed")
+            resolved_precision = 16
+
     trainer = Trainer(
         default_root_dir=default_root_dir,
         max_epochs=trainer_cfg.max_epochs,
-        precision=get_precision_str(trainer_cfg.precision),
+        precision=get_precision_str(resolved_precision),
         callbacks=create_callbacks(cfg),
         logger=tb_logger,
         gradient_clip_val=trainer_cfg.gradient_clip_val,
         accumulate_grad_batches=trainer_cfg.accumulate_grad_batches,
         val_check_interval=trainer_cfg.val_check_interval,
         log_every_n_steps=trainer_cfg.log_every_n_steps,
-        deterministic=True,
+        accelerator=trainer_cfg.get("accelerator", "auto"),
+        devices=trainer_cfg.get("devices", 1),
+        strategy=trainer_cfg.get("strategy", "auto"),
+        deterministic=trainer_cfg.get("deterministic", True),
+        benchmark=trainer_cfg.get("benchmark", False),
+        fast_dev_run=trainer_cfg.get("fast_dev_run", False),
+        limit_train_batches=trainer_cfg.get("limit_train_batches", 1.0),
+        limit_val_batches=trainer_cfg.get("limit_val_batches", 1.0),
+        limit_test_batches=trainer_cfg.get("limit_test_batches", 1.0),
         enable_model_summary=False,
     )
 
