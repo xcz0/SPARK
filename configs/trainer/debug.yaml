@@ -1,5 +1,5 @@
 # Debug Trainer 配置 - 用于快速测试训练流程
-default_root_dir: ./outputs/debug  # 调试输出目录
+default_root_dir: ${oc.env:OUTPUT_ROOT}/debug  # 调试输出目录
 
 # 训练控制 - 快速测试
 max_epochs: 2              # 仅运行 2 个 epoch

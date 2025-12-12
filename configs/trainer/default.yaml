@@ -1,5 +1,5 @@
 # 默认 Trainer 配置 (PyTorch Lightning)
-default_root_dir: ./outputs/pred  # 默认输出目录
+default_root_dir: ${oc.env:OUTPUT_ROOT}/pred  # 默认输出目录
 
 # 训练控制
 max_epochs: 200            # 最大训练轮数

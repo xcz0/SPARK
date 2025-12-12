@@ -10,11 +10,11 @@ Usage:
 from pathlib import Path
 from typing import Literal
 
-import hydra
+from dotenv import load_dotenv
 import torch
 from loguru import logger
+import hydra
 from omegaconf import DictConfig, OmegaConf
-
 from lightning.pytorch import Trainer, seed_everything
 from lightning.pytorch.callbacks import (
     EarlyStopping,
@@ -28,6 +28,9 @@ from lightning.pytorch.loggers import TensorBoardLogger
 from spark.data.config import FeatureConfig
 from spark.data.datamodule import ReviewDataModule
 from spark.models.module import SPARKModule
+
+# 在模块初始化时就加载环境变量，确保 Hydra 配置解析时能访问到
+load_dotenv(Path(__file__).parent.parent / ".env", override=True)
 
 # 开启 Tensor Cores 优化 (对于 3090/4090/A100 等显卡有显著加速)
 torch.set_float32_matmul_precision("high")
@@ -141,6 +144,9 @@ def find_checkpoint(root_dir: Path, exp_name: str, exp_version: str) -> str | No
 @hydra.main(version_base=None, config_path="../configs", config_name="config")
 def main(cfg: DictConfig) -> None:
     """主训练函数。"""
+    # 解析配置中的环境变量
+    OmegaConf.resolve(cfg)
+
     logger.info(f"配置:\n{OmegaConf.to_yaml(cfg)}")
 
     seed_everything(cfg.experiment.seed, workers=True)

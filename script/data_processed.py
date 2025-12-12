@@ -1,13 +1,16 @@
+import os
 from pathlib import Path
 import logging
 from multiprocessing import Pool, cpu_count
 from functools import partial
 from dataclasses import dataclass
 
+from dotenv import load_dotenv
 import pandas as pd
 import numpy as np
 from tqdm import tqdm
 
+load_dotenv()
 # 配置日志
 logging.basicConfig(
     filename="summary_errors.log",
@@ -15,8 +18,9 @@ logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s",
 )
 
-RAW_DATA_DIR = Path("./data/raw/")
-OUTPUT_DIR = Path("./data/processed/")
+
+RAW_DATA_DIR = Path(os.environ.get("DATA_ROOT", "./data")) / "raw"
+OUTPUT_DIR = Path(os.environ.get("DATA_ROOT", "./data")) / "processed"
 FILL_LARGE_VALUE = 1e6
 USER_AMOUNT = 5
 
